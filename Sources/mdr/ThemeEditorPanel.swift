@@ -11,12 +11,16 @@ struct ThemeEditorPanel: View {
     let chrome: Theme
     let session: ThemeEditorSession
     let initialAppearance: ThemeAppearance
-    @Binding var dragOffset: CGSize
     let dragBounds: CGSize
     let bodyMaxHeight: CGFloat
     let onSave: (Theme) throws -> Void
     let onClose: () -> Void
 
+    /// Panel-local so dragging re-renders only this view, not the page.
+    /// `settledOffset` persists between drags; `dragTranslation` is the live
+    /// gesture delta, which the gesture system coalesces into the render pass.
+    @State private var settledOffset: CGSize = .zero
+    @GestureState private var dragTranslation: CGSize = .zero
     @State private var name: String
     @State private var activeAppearance: ThemeAppearance
     @State private var isAdvanced = false
@@ -25,7 +29,6 @@ struct ThemeEditorPanel: View {
     @State private var simpleDirty: Set<ThemeAppearance> = []
     @State private var errorMessage: String?
     @State private var isMinimized = false
-    @State private var dragStart: CGSize?
     @State private var isCancelHovering = false
     @State private var isInspectHovering = false
 
@@ -34,7 +37,6 @@ struct ThemeEditorPanel: View {
         chrome: Theme,
         session: ThemeEditorSession,
         initialAppearance: ThemeAppearance,
-        dragOffset: Binding<CGSize>,
         dragBounds: CGSize,
         bodyMaxHeight: CGFloat,
         onSave: @escaping (Theme) throws -> Void,
@@ -44,7 +46,6 @@ struct ThemeEditorPanel: View {
         self.chrome = chrome
         self.session = session
         self.initialAppearance = initialAppearance
-        self._dragOffset = dragOffset
         self.dragBounds = dragBounds
         self.bodyMaxHeight = bodyMaxHeight
         self.onSave = onSave
@@ -71,7 +72,19 @@ struct ThemeEditorPanel: View {
                 .stroke(chrome.palette.border.opacity(0.7), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
+        .offset(combinedOffset)
         .onExitCommand(perform: onClose)
+    }
+
+    /// The current position: the settled position plus the live drag delta,
+    /// clamped so the panel stays fully inside the window.
+    private var combinedOffset: CGSize {
+        clamped(
+            CGSize(
+                width: settledOffset.width + dragTranslation.width,
+                height: settledOffset.height + dragTranslation.height
+            )
+        )
     }
 
     // MARK: - Header
@@ -138,18 +151,18 @@ struct ThemeEditorPanel: View {
         }
         .contentShape(Rectangle())
         .gesture(
-            DragGesture()
-                .onChanged { value in
-                    let base = dragStart ?? dragOffset
-                    dragStart = base
-                    dragOffset = clamped(
+            DragGesture(minimumDistance: 1)
+                .updating($dragTranslation) { value, state, _ in
+                    state = value.translation
+                }
+                .onEnded { value in
+                    settledOffset = clamped(
                         CGSize(
-                            width: base.width + value.translation.width,
-                            height: base.height + value.translation.height
+                            width: settledOffset.width + value.translation.width,
+                            height: settledOffset.height + value.translation.height
                         )
                     )
                 }
-                .onEnded { _ in dragStart = nil }
         )
     }
 
@@ -228,7 +241,7 @@ struct ThemeEditorPanel: View {
                                     .stroke(
                                         activeAppearance == appearance
                                             ? chrome.palette.primary.opacity(0.9)
-                                            : chrome.palette.border.opacity(0.7),
+                                            : chrome.palette.border,
                                         lineWidth: 1
                                     )
                             )
@@ -520,11 +533,14 @@ struct ThemeEditorPanel: View {
         draft.palette(for: activeAppearance)
     }
 
-    /// Keeps the panel's edges inside the window; the resting spot is the
-    /// bottom-right, so offsets are never positive.
+    /// Keeps the panel inside the window; the resting spot is bottom-right,
+    /// so offsets are never positive. The expanded height is bounded by
+    /// `bodyMaxHeight` plus the fixed header/footer (~92pt), so the header
+    /// stays reachable at the top of the drag.
     private func clamped(_ offset: CGSize) -> CGSize {
+        let panelHeight = bodyMaxHeight + 92
         let horizontal = max(0, dragBounds.width - 448)
-        let vertical = max(0, dragBounds.height - 140)
+        let vertical = max(0, dragBounds.height - panelHeight - 32)
         return CGSize(
             width: min(0, max(offset.width, -horizontal)),
             height: min(0, max(offset.height, -vertical))

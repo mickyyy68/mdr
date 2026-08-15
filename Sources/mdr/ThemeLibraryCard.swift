@@ -32,7 +32,7 @@ struct ThemeLibraryCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isActive ? chrome.palette.primary.opacity(0.9) : chrome.palette.border.opacity(0.7), lineWidth: 1)
+                .stroke(isActive ? chrome.palette.primary.opacity(0.9) : chrome.palette.border, lineWidth: 1)
         )
         .overlay(isHovering && !isActive ? RoundedRectangle(cornerRadius: 12).fill(chrome.palette.accent.opacity(0.1)) : nil)
         .contentShape(RoundedRectangle(cornerRadius: 12))

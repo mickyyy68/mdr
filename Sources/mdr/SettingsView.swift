@@ -18,7 +18,6 @@ struct SettingsView: View {
     @State private var isConfirmingReset = false
     @State private var statusMessage: String?
     @State private var errorMessage: String?
-    @State private var editorDragOffset: CGSize = .zero
     @State private var hoveredMode: ThemeAppearanceMode?
     @State private var isBackHovering = false
     @State private var statusTask: Task<Void, Never>?
@@ -60,14 +59,12 @@ struct SettingsView: View {
                         chrome: chrome,
                         session: session,
                         initialAppearance: store.effectiveAppearance,
-                        dragOffset: $editorDragOffset,
                         dragBounds: CGSize(width: geo.size.width, height: geo.size.height),
                         bodyMaxHeight: editorBodyMaxHeight(in: geo.size.height),
                         onSave: saveEditorDraft,
                         onClose: closeEditor
                     )
                     .id(session.id)
-                    .offset(editorDragOffset)
                     .padding(16)
                     .zIndex(10)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -155,7 +152,7 @@ struct SettingsView: View {
 
                     Text("Choose how \(CLI.name) looks. Use a built-in theme or make your own.")
                         .font(chrome.fonts.font(13))
-                        .foregroundColor(chrome.palette.mutedForeground.opacity(0.8))
+                        .foregroundColor(chrome.palette.mutedForeground)
                         .padding(.horizontal, 12)
                 }
 
@@ -249,7 +246,7 @@ struct SettingsView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(
-                        isActive ? chrome.palette.primary.opacity(0.9) : chrome.palette.border.opacity(0.7),
+                        isActive ? chrome.palette.primary.opacity(0.9) : chrome.palette.border,
                         lineWidth: 1
                     )
             )
@@ -387,7 +384,6 @@ struct SettingsView: View {
 
     private func openEditor(seed: Theme, isEditing: Bool) {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            editorDragOffset = .zero
             editorSession = ThemeEditorSession(
                 id: UUID(),
                 isEditing: isEditing,
