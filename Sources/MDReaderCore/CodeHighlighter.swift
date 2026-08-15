@@ -33,23 +33,23 @@ public enum CodeHighlighter {
         "not", "or", "and", "from",
     ]
 
-    public static func color(for kind: CodeTokenKind) -> Color {
+    public static func color(for kind: CodeTokenKind, palette: Palette) -> Color {
         switch kind {
-        case .comment: Palette.syntaxComment
-        case .string: Palette.syntaxString
-        case .number: Palette.syntaxNumber
-        case .keyword: Palette.syntaxKeyword
-        case .plain: Palette.syntaxPlain
+        case .comment: palette.syntaxComment
+        case .string: palette.syntaxString
+        case .number: palette.syntaxNumber
+        case .keyword: palette.syntaxKeyword
+        case .plain: palette.syntaxPlain
         }
     }
 
-    public static func highlight(_ code: String) -> AttributedString {
+    public static func highlight(_ code: String, palette: Palette) -> AttributedString {
         var result = AttributedString()
         var index = code.startIndex
         while index < code.endIndex {
             let (segment, kind) = consumeToken(code, at: &index)
             var attrs = AttributeContainer()
-            attrs.foregroundColor = color(for: kind)
+            attrs.foregroundColor = color(for: kind, palette: palette)
             result.append(AttributedString(String(segment), attributes: attrs))
         }
         return result

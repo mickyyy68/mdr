@@ -7,7 +7,22 @@ struct CLIArgumentParserTests {
     }
 
     @Test func parsesFilePaths() throws {
-        #expect(try CLI.parse(["a.md", "b.md"]) == .readFiles(["a.md", "b.md"]))
+        #expect(try CLI.parse(["a.md", "b.md"]) == .readFiles(["a.md", "b.md"], themePath: nil))
+    }
+
+    @Test func parsesThemeFlag() throws {
+        #expect(try CLI.parse(["--theme", "theme.json", "a.md"]) == .readFiles(["a.md"], themePath: "theme.json"))
+        #expect(try CLI.parse(["-t", "theme.json", "a.md"]) == .readFiles(["a.md"], themePath: "theme.json"))
+        #expect(try CLI.parse(["a.md", "--theme", "t.json"]) == .readFiles(["a.md"], themePath: "t.json"))
+    }
+
+    @Test func themeFlagRequiresValue() {
+        #expect(throws: CLIError.missingValue("--theme")) {
+            try CLI.parse(["--theme"])
+        }
+        #expect(throws: CLIError.missingValue("--theme")) {
+            try CLI.parse(["a.md", "-t"])
+        }
     }
 
     @Test func helpFlags() throws {

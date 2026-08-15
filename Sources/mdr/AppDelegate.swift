@@ -6,10 +6,13 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let documents: [DocumentLoader.LoadedDocument]
+    private let theme: Theme
     private var windows: [NSWindow] = []
+    private var settingsWindow: NSWindow?
 
-    init(documents: [DocumentLoader.LoadedDocument]) {
+    init(documents: [DocumentLoader.LoadedDocument], theme: Theme) {
         self.documents = documents
+        self.theme = theme
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -24,9 +27,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
+    // MARK: - Windows
+
     private func openWindow(for document: DocumentLoader.LoadedDocument) {
         let hostingController = NSHostingController(
-            rootView: MarkdownReaderView(document: document)
+            rootView: MarkdownReaderView(document: document, theme: theme)
         )
         let window = NSWindow(contentViewController: hostingController)
         window.title = document.url.lastPathComponent
@@ -34,11 +39,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 900, height: 720))
         window.minSize = NSSize(width: 480, height: 360)
-        window.backgroundColor = NSColor(Palette.background)
+        window.backgroundColor = NSColor(theme.palette.background)
         window.center()
         window.makeKeyAndOrderFront(nil)
         windows.append(window)
     }
+
+    @objc private func openSettings(_ sender: Any?) {
+        if settingsWindow == nil {
+            let settingsView = SettingsView(configURL: CLI.defaultThemePath)
+            let hostingController = NSHostingController(rootView: settingsView)
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "\(CLI.name) Settings"
+            window.isReleasedWhenClosed = false
+            window.setContentSize(NSSize(width: 540, height: 600))
+            window.minSize = NSSize(width: 480, height: 480)
+            settingsWindow = window
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // MARK: - Menu
 
     private func configureMainMenu() {
         let mainMenu = NSMenu()
@@ -50,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             withTitle: "About \(CLI.name)",
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
+        )
+        appMenu.addItem(.separator())
+        appMenu.addItem(
+            withTitle: "Settings…",
+            action: #selector(openSettings(_:)),
+            keyEquivalent: ","
         )
         appMenu.addItem(.separator())
         appMenu.addItem(

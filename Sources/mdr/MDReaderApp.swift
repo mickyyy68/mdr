@@ -22,12 +22,16 @@ enum MDReaderApp {
         case .showVersion:
             print("\(CLI.name) \(CLI.version)")
 
-        case .readFiles(let paths):
+        case .readFiles(let paths, let themePath):
             do {
                 let documents = try paths.map {
                     try DocumentLoader.load(url: URL(fileURLWithPath: $0))
                 }
-                runReader(documents: documents)
+                let theme = try Theme.resolve(
+                    explicit: themePath.map { URL(fileURLWithPath: $0) },
+                    defaultFile: CLI.defaultThemePath
+                )
+                runReader(documents: documents, theme: theme)
             } catch {
                 fputs("\(error.localizedDescription)\n", stderr)
                 exit(EXIT_FAILURE)
@@ -36,9 +40,9 @@ enum MDReaderApp {
     }
 
     @MainActor
-    private static func runReader(documents: [DocumentLoader.LoadedDocument]) {
+    private static func runReader(documents: [DocumentLoader.LoadedDocument], theme: Theme) {
         let application = NSApplication.shared
-        let delegate = AppDelegate(documents: documents)
+        let delegate = AppDelegate(documents: documents, theme: theme)
         application.delegate = delegate
         application.setActivationPolicy(.regular)
         application.run()

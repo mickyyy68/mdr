@@ -4,33 +4,59 @@ import SwiftUI
 /// Linear design system — tokens from Linear's official design system (dark theme).
 ///
 /// Source: Linear's `globals.css` design tokens (oklch), converted to sRGB hex.
-public enum Palette {
+///
+/// Tokens are value types so they can be composed into a `Theme` and overridden
+/// at runtime; `linear` carries the canonical defaults.
+public struct Palette: Equatable, Sendable {
     // MARK: Surfaces
-    public static let background = Color(hex: 0x191A24)
-    public static let foreground = Color(hex: 0xFFFFFF)
-    public static let card = Color(hex: 0x1F202D)
-    public static let cardForeground = Color(hex: 0xF8FAFC)
-    public static let secondary = Color(hex: 0x272A3A)
-    public static let secondaryForeground = Color(hex: 0x868798)
-    public static let muted = Color(hex: 0x1F202D)
-    public static let mutedForeground = Color(hex: 0x9B9EAB)
-    public static let accent = Color(hex: 0x31323F)
-    public static let accentForeground = Color(hex: 0xF8FAFC)
+    public var background: Color
+    public var foreground: Color
+    public var card: Color
+    public var cardForeground: Color
+    public var secondary: Color
+    public var secondaryForeground: Color
+    public var muted: Color
+    public var mutedForeground: Color
+    public var accent: Color
+    public var accentForeground: Color
 
     // MARK: Brand
-    public static let primary = Color(hex: 0x6B77FF)
-    public static let destructive = Color(hex: 0x7F1D1D)
+    public var primary: Color
+    public var destructive: Color
 
     // MARK: Stroke
-    public static let border = Color(hex: 0x38394C)
+    public var border: Color
 
     // MARK: Code syntax highlighting (Linear-adjacent hues)
-    public static let syntaxKeyword = Color(hex: 0x6B77FF)
-    public static let syntaxString = Color(hex: 0xA5B4FC)
-    public static let syntaxComment = Color(hex: 0x6B7280)
-    public static let syntaxType = Color(hex: 0x8B93E7)
-    public static let syntaxNumber = Color(hex: 0xFBBF24)
-    public static let syntaxPlain = Color(hex: 0xE5E7EB)
+    public var syntaxKeyword: Color
+    public var syntaxString: Color
+    public var syntaxComment: Color
+    public var syntaxType: Color
+    public var syntaxNumber: Color
+    public var syntaxPlain: Color
+
+    /// The canonical Linear dark palette.
+    public static let linear = Palette(
+        background: Color(hex: 0x191A24),
+        foreground: Color(hex: 0xFFFFFF),
+        card: Color(hex: 0x1F202D),
+        cardForeground: Color(hex: 0xF8FAFC),
+        secondary: Color(hex: 0x272A3A),
+        secondaryForeground: Color(hex: 0x868798),
+        muted: Color(hex: 0x1F202D),
+        mutedForeground: Color(hex: 0x9B9EAB),
+        accent: Color(hex: 0x31323F),
+        accentForeground: Color(hex: 0xF8FAFC),
+        primary: Color(hex: 0x6B77FF),
+        destructive: Color(hex: 0x7F1D1D),
+        border: Color(hex: 0x38394C),
+        syntaxKeyword: Color(hex: 0x6B77FF),
+        syntaxString: Color(hex: 0xA5B4FC),
+        syntaxComment: Color(hex: 0x6B7280),
+        syntaxType: Color(hex: 0x8B93E7),
+        syntaxNumber: Color(hex: 0xFBBF24),
+        syntaxPlain: Color(hex: 0xE5E7EB)
+    )
 }
 
 public extension Color {
@@ -45,22 +71,61 @@ public extension Color {
     }
 }
 
-public enum Spacing {
-    public static let xs: CGFloat = 4
-    public static let sm: CGFloat = 8
-    public static let md: CGFloat = 12
-    public static let lg: CGFloat = 16
-    public static let xl: CGFloat = 24
-    public static let xxl: CGFloat = 32
+/// Vertical rhythm tokens.
+public struct Spacing: Equatable, Sendable {
+    public var xs: CGFloat
+    public var sm: CGFloat
+    public var md: CGFloat
+    public var lg: CGFloat
+    public var xl: CGFloat
+    public var xxl: CGFloat
+
+    public static let linear = Spacing(xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32)
 }
 
-public enum Radius {
-    public static let sm: CGFloat = 4
-    public static let md: CGFloat = 6
-    public static let lg: CGFloat = 8
+/// Corner radius tokens.
+public struct Radius: Equatable, Sendable {
+    public var sm: CGFloat
+    public var md: CGFloat
+    public var lg: CGFloat
+
+    public static let linear = Radius(sm: 4, md: 6, lg: 8)
 }
 
-public enum Fonts {
+/// Typography tokens: an optional family plus named size roles.
+public struct FontConfig: Equatable, Sendable {
+    /// The font family to use. `nil` or `"Inter"` resolve to the per-weight
+    /// Inter names below (with a system fallback); any other installed family
+    /// is used directly with the requested weight.
+    public var family: String?
+    public var heading1: CGFloat
+    public var heading2: CGFloat
+    public var heading3: CGFloat
+    public var heading4: CGFloat
+    public var heading5: CGFloat
+    public var body: CGFloat
+    public var caption: CGFloat
+    public var code: CGFloat
+    public var inlineCode: CGFloat
+    public var label: CGFloat
+    public var lineSpacing: CGFloat
+
+    /// The canonical Linear typography.
+    public static let linear = FontConfig(
+        family: "Inter",
+        heading1: 26,
+        heading2: 20,
+        heading3: 17,
+        heading4: 15,
+        heading5: 14,
+        body: 15,
+        caption: 13,
+        code: 13,
+        inlineCode: 12.5,
+        label: 11,
+        lineSpacing: 3
+    )
+
     private static let interNames: [Font.Weight: String] = [
         .light: "Inter-Light",
         .regular: "Inter-Regular",
@@ -69,14 +134,17 @@ public enum Fonts {
         .bold: "Inter-Bold",
     ]
 
-    /// `true` when the Inter font family is installed; resolved once at launch.
+    /// `true` when the Inter font family is installed; resolved once.
     private static let interAvailable = interNames.values.allSatisfy {
         NSFont(name: $0, size: 12) != nil
     }
 
-    /// Linear's typeface. Falls back to the system font when Inter is unavailable.
-    public static func inter(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        if interAvailable, let name = interNames[weight] {
+    /// Resolves a font at `size` and `weight` according to the configured family.
+    public func font(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        if let family, family != "Inter", NSFont(name: family, size: size) != nil {
+            return .custom(family, size: size).weight(weight)
+        }
+        if Self.interAvailable, let name = Self.interNames[weight] {
             return .custom(name, size: size)
         }
         return .system(size: size, weight: weight)

@@ -17,6 +17,7 @@ swift build               # build the project
 swift test                # run the swift-testing suite
 swift run mdr file.md     # open file.md in the reader (one or more files)
 swift run mdr --help      # usage; --version prints the version
+swift run mdr --theme theme.json file.md   # load design tokens from a JSON config
 ```
 
 ## Architecture
@@ -25,12 +26,13 @@ Two targets with a single dependency direction:
 `mdr` (executable) → `MDReaderCore` (library) → `swift-markdown`.
 
 - `Sources/MDReaderCore/` — pure, testable logic exposed through a public API:
-  - `DesignSystem.swift` — `Palette`, `Spacing`, `Radius`, `Fonts` (Linear-sourced tokens)
+  - `DesignSystem.swift` — `Palette`, `Spacing`, `Radius`, `FontConfig` (Linear-sourced tokens)
+  - `Theme.swift` — config-driven design tokens (`Theme`, `ThemeOverride`, `ThemeError`; `--theme` JSON overrides Linear defaults)
   - `CLI.swift` — argument parsing (`Command`, `CLIError`)
   - `DocumentLoader.swift` — file loading with UTF-8/16/Latin-1 fallback
   - `CodeHighlighter.swift` — scanner-based code tokenizer
   - `MarkdownRenderer.swift` — markdown AST → SwiftUI views (`MarkdownViewBuilder`, `MarkdownReaderView`)
-- `Sources/mdr/` — thin app shell: `MDReaderApp.swift` (`@main` entry point), `AppDelegate.swift` (windows, main menu)
+- `Sources/mdr/` — thin app shell: `MDReaderApp.swift` (`@main` entry point), `AppDelegate.swift` (windows, main menu), `SettingsView.swift` (design-token config window)
 - `Tests/mdrTests/` — swift-testing unit tests for core logic
 
 Dependency rule: pure logic belongs in `MDReaderCore`; AppKit/UI glue belongs in

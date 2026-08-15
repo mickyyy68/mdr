@@ -2,12 +2,14 @@ import AppKit
 import Markdown
 import SwiftUI
 
-/// Renders a parsed markdown AST into SwiftUI views using the Linear design system.
+/// Renders a parsed markdown AST into SwiftUI views using the design system.
 public struct MarkdownViewBuilder {
     public let baseURL: URL
+    public let theme: Theme
 
-    public init(baseURL: URL) {
+    public init(baseURL: URL, theme: Theme) {
         self.baseURL = baseURL
+        self.theme = theme
     }
 
     // MARK: - Blocks
@@ -48,16 +50,16 @@ public struct MarkdownViewBuilder {
 
     private func headingView(_ heading: Heading) -> some View {
         let size: CGFloat = switch heading.level {
-        case 1: 26
-        case 2: 20
-        case 3: 17
-        case 4: 15
-        default: 14
+        case 1: theme.fonts.heading1
+        case 2: theme.fonts.heading2
+        case 3: theme.fonts.heading3
+        case 4: theme.fonts.heading4
+        default: theme.fonts.heading5
         }
         let weight: Font.Weight = heading.level <= 2 ? .bold : .semibold
-        var attrs = baseAttrs(font: Fonts.inter(size, weight: weight), color: Palette.foreground)
+        var attrs = baseAttrs(font: theme.fonts.font(size, weight: weight), color: theme.palette.foreground)
         return Text(attributed(heading, attrs: &attrs))
-            .padding(.top, heading.level == 1 ? Spacing.sm : Spacing.xs)
+            .padding(.top, heading.level == 1 ? theme.spacing.sm : theme.spacing.xs)
             .textSelection(.enabled)
     }
 
@@ -69,9 +71,9 @@ public struct MarkdownViewBuilder {
         if children.count == 1, let image = children.first as? Markdown.Image {
             imageView(image)
         } else {
-            var attrs = baseAttrs(font: Fonts.inter(15), color: Palette.cardForeground)
+            var attrs = baseAttrs(font: theme.fonts.font(theme.fonts.body), color: theme.palette.cardForeground)
             Text(attributed(paragraph, attrs: &attrs))
-                .lineSpacing(3)
+                .lineSpacing(theme.fonts.lineSpacing)
                 .textSelection(.enabled)
         }
     }
@@ -79,7 +81,7 @@ public struct MarkdownViewBuilder {
     // MARK: - Lists
 
     private func unorderedListView(_ list: UnorderedList) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
+        VStack(alignment: .leading, spacing: theme.spacing.sm) {
             ForEach(Array(list.children.enumerated()), id: \.offset) { _, child in
                 listItemRow(child, marker: bulletMarker)
             }
@@ -87,7 +89,7 @@ public struct MarkdownViewBuilder {
     }
 
     private func orderedListView(_ list: OrderedList) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
+        VStack(alignment: .leading, spacing: theme.spacing.sm) {
             ForEach(Array(list.children.enumerated()), id: \.offset) { index, child in
                 listItemRow(child, marker: numberMarker(index + 1))
             }
@@ -96,18 +98,18 @@ public struct MarkdownViewBuilder {
 
     private var bulletMarker: some View {
         Text("•")
-            .font(Fonts.inter(15, weight: .bold))
-            .foregroundColor(Palette.primary)
+            .font(theme.fonts.font(theme.fonts.body, weight: .bold))
+            .foregroundColor(theme.palette.primary)
     }
 
     private func numberMarker(_ number: Int) -> some View {
         Text("\(number).")
-            .font(Fonts.inter(15))
-            .foregroundColor(Palette.mutedForeground)
+            .font(theme.fonts.font(theme.fonts.body))
+            .foregroundColor(theme.palette.mutedForeground)
     }
 
     private func listItemRow(_ item: Markup, marker: some View) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.md) {
+        HStack(alignment: .firstTextBaseline, spacing: theme.spacing.md) {
             marker
             childrenBlocks(item)
         }
@@ -117,43 +119,43 @@ public struct MarkdownViewBuilder {
 
     private func codeBlockView(_ codeBlock: CodeBlock) -> some View {
         let language = codeBlock.language ?? ""
-        return VStack(alignment: .leading, spacing: Spacing.sm) {
+        return VStack(alignment: .leading, spacing: theme.spacing.sm) {
             if !language.isEmpty {
                 Text(language)
-                    .font(Fonts.inter(11, weight: .medium))
-                    .foregroundColor(Palette.mutedForeground)
+                    .font(theme.fonts.font(theme.fonts.label, weight: .medium))
+                    .foregroundColor(theme.palette.mutedForeground)
                     .textCase(.lowercase)
             }
-            Text(CodeHighlighter.highlight(codeBlock.code))
-                .font(.system(size: 13, design: .monospaced))
+            Text(CodeHighlighter.highlight(codeBlock.code, palette: theme.palette))
+                .font(.system(size: theme.fonts.code, design: .monospaced))
                 .textSelection(.enabled)
         }
-        .padding(Spacing.lg)
+        .padding(theme.spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: Radius.md).fill(Palette.secondary))
+        .background(RoundedRectangle(cornerRadius: theme.radius.md).fill(theme.palette.secondary))
         .overlay(
-            RoundedRectangle(cornerRadius: Radius.md)
-                .stroke(Palette.border.opacity(0.7), lineWidth: 1)
+            RoundedRectangle(cornerRadius: theme.radius.md)
+                .stroke(theme.palette.border.opacity(0.7), lineWidth: 1)
         )
     }
 
     // MARK: - Quotes
 
     private func quoteView(_ quote: BlockQuote) -> some View {
-        HStack(alignment: .top, spacing: Spacing.lg) {
+        HStack(alignment: .top, spacing: theme.spacing.lg) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(Palette.primary.opacity(0.5))
+                .fill(theme.palette.primary.opacity(0.5))
                 .frame(width: 3)
             childrenBlocks(quote)
         }
-        .padding(.leading, Spacing.md)
+        .padding(.leading, theme.spacing.md)
     }
 
     // MARK: - Rules
 
     private func ruleView() -> some View {
         Rectangle()
-            .fill(Palette.border.opacity(0.6))
+            .fill(theme.palette.border.opacity(0.6))
             .frame(height: 1)
     }
 
@@ -164,7 +166,7 @@ public struct MarkdownViewBuilder {
         let indices = Array(rows.indices)
         let columnCount = max(1, table.maxColumnCount)
         return VStack(alignment: .leading, spacing: 0) {
-            Grid(alignment: .leading, horizontalSpacing: Spacing.xl, verticalSpacing: Spacing.sm) {
+            Grid(alignment: .leading, horizontalSpacing: theme.spacing.xl, verticalSpacing: theme.spacing.sm) {
                 ForEach(indices, id: \.self) { index in
                     let row = rows[index]
                     let isHeader = row is Markdown.Table.Head
@@ -180,21 +182,21 @@ public struct MarkdownViewBuilder {
                     }
                 }
             }
-            .padding(Spacing.lg)
-            .background(RoundedRectangle(cornerRadius: Radius.md).fill(Palette.card))
+            .padding(theme.spacing.lg)
+            .background(RoundedRectangle(cornerRadius: theme.radius.md).fill(theme.palette.card))
             .overlay(
-                RoundedRectangle(cornerRadius: Radius.md)
-                    .stroke(Palette.border.opacity(0.7), lineWidth: 1)
+                RoundedRectangle(cornerRadius: theme.radius.md)
+                    .stroke(theme.palette.border.opacity(0.7), lineWidth: 1)
             )
         }
     }
 
     private func tableCellView(_ cell: Markup, header: Bool) -> SwiftUI.Text {
         if header {
-            var attrs = baseAttrs(font: Fonts.inter(13, weight: .semibold), color: Palette.foreground)
+            var attrs = baseAttrs(font: theme.fonts.font(theme.fonts.caption, weight: .semibold), color: theme.palette.foreground)
             return Text(attributed(cell, attrs: &attrs))
         } else {
-            var attrs = baseAttrs(font: Fonts.inter(13), color: Palette.cardForeground)
+            var attrs = baseAttrs(font: theme.fonts.font(theme.fonts.caption), color: theme.palette.cardForeground)
             return Text(attributed(cell, attrs: &attrs))
         }
     }
@@ -213,7 +215,7 @@ public struct MarkdownViewBuilder {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: 640)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                    .clipShape(RoundedRectangle(cornerRadius: theme.radius.md))
                     .accessibilityLabel(altText.isEmpty ? "Image" : altText)
             }
         }
@@ -257,13 +259,13 @@ public struct MarkdownViewBuilder {
 
         case let code as InlineCode:
             var codeAttrs = AttributeContainer()
-            codeAttrs.font = .system(size: 12.5, weight: .medium, design: .monospaced)
-            codeAttrs.foregroundColor = Palette.syntaxKeyword
-            codeAttrs.backgroundColor = Palette.secondary
+            codeAttrs.font = .system(size: theme.fonts.inlineCode, weight: .medium, design: .monospaced)
+            codeAttrs.foregroundColor = theme.palette.syntaxKeyword
+            codeAttrs.backgroundColor = theme.palette.secondary
             return AttributedString(code.code, attributes: codeAttrs)
 
         case let link as Markdown.Link:
-            attrs.foregroundColor = Palette.primary
+            attrs.foregroundColor = theme.palette.primary
             attrs.underlineStyle = SwiftUI.Text.LineStyle(pattern: .solid)
             if let dest = link.destination, let url = URL(string: dest) {
                 attrs.link = url
@@ -296,22 +298,22 @@ public struct MarkdownReaderView: View {
     let document: Document
     let builder: MarkdownViewBuilder
 
-    public init(document loaded: DocumentLoader.LoadedDocument) {
+    public init(document loaded: DocumentLoader.LoadedDocument, theme: Theme) {
         self.document = Document(parsing: loaded.content)
-        self.builder = MarkdownViewBuilder(baseURL: loaded.url.deletingLastPathComponent())
+        self.builder = MarkdownViewBuilder(baseURL: loaded.url.deletingLastPathComponent(), theme: theme)
     }
 
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.lg) {
+            VStack(alignment: .leading, spacing: builder.theme.spacing.lg) {
                 ForEach(Array(document.children.enumerated()), id: \.offset) { _, child in
                     builder.blockView(child)
                 }
             }
-            .padding(Spacing.xxl)
+            .padding(builder.theme.spacing.xxl)
             .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .top)
         }
-        .background(Palette.background)
+        .background(builder.theme.palette.background)
     }
 }
