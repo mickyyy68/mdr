@@ -53,7 +53,9 @@ core; everything else stays `internal`.
   not excuse leaving this one stale.
 - `docs/specs/` designs stay consistent with the code: a change that
   contradicts an approved spec updates or supersedes the spec in the same
-  change.
+  change. Spec status values: `Approved` (matches current code) or
+  `Superseded` (replaced by a newer design; a `Superseded by:` note records
+  what changed and what still holds).
 - `docs/bugs/` notes are dated, point-in-time records: they are never swept
   or retroactively edited by this rule. Add a note only when asked to
   document a bug.

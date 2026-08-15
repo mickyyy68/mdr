@@ -1,7 +1,16 @@
 # Theme Settings — Design
 
-- **Status:** Approved
+- **Status:** Superseded
 - **Date:** 2026-08-15
+- **Superseded by:** the implemented in-app theme experience (see the "Theme
+  Editor & Library — Design" spec and `Sources/mdr/SettingsView.swift`). The
+  guidance-only Settings window with read-only JSON preview and "Create Config" /
+  "Reveal in Finder" actions was replaced by a live appearance section (Color
+  scheme tiles, theme library) with a guided/advanced floating editor and JSON
+  import/export. Still in force: `theme.json` remains the single source of
+  truth loaded at launch via `--theme`, partial overrides merge on top of
+  Linear defaults, all tokens are configurable, and invalid configs print an
+  `mdr:` error and exit nonzero.
 
 ## Goal
 

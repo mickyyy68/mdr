@@ -123,7 +123,7 @@ public struct Theme: Equatable, Sendable {
     }
 
     /// Pretty-printed JSON of a fully-specified Linear theme, used to bootstrap
-    /// a user config file ("Create Config" in Settings).
+    /// a user config file.
     public static func defaultConfigData() throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
