@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -10,11 +10,19 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0")
     ],
     targets: [
-        .executableTarget(
-            name: "mdreader",
+        .target(
+            name: "MDReaderCore",
             dependencies: [
                 .product(name: "Markdown", package: "swift-markdown")
             ]
+        ),
+        .executableTarget(
+            name: "mdreader",
+            dependencies: ["MDReaderCore"]
+        ),
+        .testTarget(
+            name: "mdreaderTests",
+            dependencies: ["MDReaderCore"]
         )
     ]
 )
