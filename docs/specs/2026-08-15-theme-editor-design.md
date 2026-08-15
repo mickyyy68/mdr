@@ -1,7 +1,15 @@
 # Theme Editor & Library — Design
 
-- **Status:** Approved
+- **Status:** Superseded
 - **Date:** 2026-08-15
+- **Superseded by:** the implemented T3-fidelity settings redesign. The split
+  live-preview editor and two-level navigation described here were replaced
+  during implementation by an in-page appearance section (Color scheme tiles,
+  theme library grid) with a floating draggable editor panel and paste-JSON
+  import dialog; see `Sources/mdr/SettingsView.swift`, `ThemeEditorPanel.swift`,
+  `ThemeLibraryCard.swift`, `ThemePreviewViews.swift`, `ColorPicker.swift`, and
+  `ThemeImportView.swift`. Still in force: `theme.json` remains the single
+  source of truth, the guided/advanced editor model, and JSON import/export.
 
 ## Goal
 
