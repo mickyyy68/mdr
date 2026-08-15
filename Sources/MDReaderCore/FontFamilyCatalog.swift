@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// A font family choice the theme editor offers; `familyName` is `nil` for
@@ -15,10 +16,26 @@ public struct FontFamilyOption: Identifiable, Sendable, Equatable {
 }
 
 /// The curated font families the editor lists, filtered to what the renderer
-/// can actually load. Pure data; the executable supplies the loadable set from
-/// AppKit, and the catalog keeps the `nil` system-font entry and `"Inter"`
-/// (special-cased by `FontConfig.font`) even when the system lacks them.
+/// can actually load. The executable and the renderer share one loadability
+/// probe, so they can never disagree on which families are offered or used.
 public enum FontFamilyCatalog {
+    /// Families that resolve via `NSFont(name:)`, keyed by lowercased display
+    /// and PostScript name, probed once per process. `FontConfig.font` and
+    /// `options(loadable:)` both consult this; `NSFont` lookup is
+    /// case-insensitive and also accepts PostScript names, so both spellings
+    /// are kept. A family the font manager does not enumerate is treated as
+    /// unloadable.
+    public static let loadableFamilies: Set<String> = {
+        let loadable = NSFontManager.shared.availableFontFamilies.filter { NSFont(name: $0, size: 12) != nil }
+        var names = Set(loadable.map { $0.lowercased() })
+        for family in loadable {
+            if let postScript = NSFont(name: family, size: 12)?.fontName {
+                names.insert(postScript.lowercased())
+            }
+        }
+        return names
+    }()
+
     /// The offered options in display order, filtered to `loadable` families.
     /// Matching is case-insensitive; `loadable` entries may be any case.
     public static func options(loadable: Set<String>) -> [FontFamilyOption] {

@@ -189,17 +189,9 @@ public struct FontConfig: Equatable, Sendable {
         NSFont(name: $0, size: 12) != nil
     }
 
-    /// Families that resolve via `NSFont(name:)`, probed once per process.
-    /// `font(_:weight:)` consults this instead of creating an `NSFont` per
-    /// text run just to test existence. A family the font manager does not
-    /// enumerate falls back to the Inter/system path.
-    private static let loadableFamilies: Set<String> = {
-        Set(NSFontManager.shared.availableFontFamilies.filter { NSFont(name: $0, size: 12) != nil })
-    }()
-
     /// Resolves a font at `size` and `weight` according to the configured family.
     public func font(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        if let family, family != "Inter", Self.loadableFamilies.contains(family) {
+        if let family, family != "Inter", FontFamilyCatalog.loadableFamilies.contains(family.lowercased()) {
             return .custom(family, size: size).weight(weight)
         }
         if family != nil, Self.interAvailable, let name = Self.interNames[weight] {

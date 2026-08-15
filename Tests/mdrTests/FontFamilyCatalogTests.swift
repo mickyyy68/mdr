@@ -29,4 +29,12 @@ struct FontFamilyCatalogTests {
         let options = FontFamilyCatalog.options(loadable: ["georgia", "palatino"])
         #expect(Set(options.map(\.displayName)).count == options.count)
     }
+
+    @Test func loadableFamiliesAreKeyedLowercaseIncludingPostScriptNames() {
+        let families = FontFamilyCatalog.loadableFamilies
+        #expect(families.contains("helvetica neue"))
+        #expect(families.contains("helveticaneue"))
+        #expect(families.contains("menlo"))
+        #expect(families.contains("menlo-regular"))
+    }
 }

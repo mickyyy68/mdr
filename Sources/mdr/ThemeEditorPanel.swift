@@ -473,16 +473,11 @@ struct ThemeEditorPanel: View {
     }
 
     /// The font families the editor offers, filtered to what the renderer
-    /// can actually load (`FontConfig.font` gates on `NSFont(name:)`).
+    /// can actually load (`FontConfig.font` gates on the shared catalog).
     @MainActor
-    private static let fontFamilies: [FontFamilyOption] = {
-        let loadable = Set(
-            NSFontManager.shared.availableFontFamilies
-                .filter { NSFont(name: $0, size: 12) != nil }
-                .map { $0.lowercased() }
-        )
-        return FontFamilyCatalog.options(loadable: loadable)
-    }()
+    private static let fontFamilies: [FontFamilyOption] = FontFamilyCatalog.options(
+        loadable: FontFamilyCatalog.loadableFamilies
+    )
 
     // MARK: - Footer
 
