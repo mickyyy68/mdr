@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 @testable import MDReaderCore
 
@@ -24,7 +25,20 @@ struct PaletteRolesTests {
 
     @Test func catalogCoversEveryPaletteColorRole() {
         let colorRoles = PaletteRoleGroup.allCases.flatMap(\.roles).filter { $0.keyPath != nil }.count
-        #expect(colorRoles == 19)
+        let colorProperties = Mirror(reflecting: Palette.linear).children.filter { $0.value is Color }.count
+        #expect(colorRoles == colorProperties)
+    }
+
+    @Test func everyFontRoleMapsToOneTokenProperty() {
+        #expect(roleCount { if case .font = $0 { return true }; return false } == CGFloatProperties(in: FontConfig.linear))
+    }
+
+    @Test func everySpacingRoleMapsToOneTokenProperty() {
+        #expect(roleCount { if case .spacing = $0 { return true }; return false } == CGFloatProperties(in: Spacing.linear))
+    }
+
+    @Test func everyRadiusRoleMapsToOneTokenProperty() {
+        #expect(roleCount { if case .radius = $0 { return true }; return false } == CGFloatProperties(in: Radius.linear))
     }
 
     @Test func familyRoleIsTheSingleFamilyRole() {
@@ -39,5 +53,13 @@ struct PaletteRolesTests {
 
     @Test func allGroupsAreNonEmpty() {
         #expect(PaletteRoleGroup.allCases.allSatisfy { !$0.roles.isEmpty })
+    }
+
+    private func roleCount(_ matches: (PaletteRole.Kind) -> Bool) -> Int {
+        PaletteRoleGroup.allCases.flatMap(\.roles).filter { matches($0.kind) }.count
+    }
+
+    private func CGFloatProperties(in value: some Any) -> Int {
+        Mirror(reflecting: value).children.compactMap { $0.value as? CGFloat }.count
     }
 }
