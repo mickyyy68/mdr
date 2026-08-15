@@ -348,7 +348,7 @@ struct SettingsView: View {
             onUseMode: { appearance in
                 store.appearanceMode = appearance == .light ? .light : .dark
             },
-            isCustom: true,
+            isCustom: store.sourceURL != nil,
             onEdit: {
                 openEditor(seed: store.theme, isEditing: true)
             },

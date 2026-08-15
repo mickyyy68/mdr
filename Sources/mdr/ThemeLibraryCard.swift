@@ -14,7 +14,7 @@ struct ThemeLibraryCard: View {
     let isActiveMode: (ThemeAppearance) -> Bool
     let onUse: () -> Void
     let onUseMode: (ThemeAppearance) -> Void
-    /// Whether this card is the user's saved theme, shown as a badge so a
+    /// Whether this card holds the user's saved theme, shown as a badge so a
     /// custom theme named like a preset is distinguishable at a glance.
     var isCustom = false
     var onEdit: (() -> Void)?
@@ -100,18 +100,21 @@ struct ThemeLibraryCard: View {
     private var footer: some View {
         HStack(spacing: 4) {
             Button(action: onUse) {
-                Text(label)
-                    .font(chrome.fonts.font(chrome.fonts.body, weight: .medium))
-                    .foregroundColor(chrome.palette.foreground)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                HStack(spacing: 6) {
+                    Text(label)
+                        .font(chrome.fonts.font(chrome.fonts.body, weight: .medium))
+                        .foregroundColor(chrome.palette.foreground)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if isCustom && !label.localizedCaseInsensitiveContains("custom") {
+                        customBadge
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            if isCustom {
-                customBadge
-            }
+            .accessibilityLabel(isCustom ? "\(label), custom theme" : label)
             if let onEdit {
                 ghostAction("pencil", label: "Edit theme") { onEdit() }
             }
@@ -130,14 +133,17 @@ struct ThemeLibraryCard: View {
     private var customBadge: some View {
         Text("Custom")
             .font(chrome.fonts.font(chrome.fonts.label, weight: .medium))
-            .foregroundColor(chrome.palette.mutedForeground)
+            .foregroundColor(chrome.palette.foreground)
             .padding(.horizontal, 6)
             .frame(height: 18)
             .background(
                 RoundedRectangle(cornerRadius: chrome.radius.sm)
                     .fill(chrome.palette.secondary.opacity(0.9))
             )
-            .accessibilityHidden(true)
+            .overlay(
+                RoundedRectangle(cornerRadius: chrome.radius.sm)
+                    .stroke(chrome.palette.border.opacity(0.8), lineWidth: 1)
+            )
     }
 
     private func ghostAction(_ systemImage: String, label: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
