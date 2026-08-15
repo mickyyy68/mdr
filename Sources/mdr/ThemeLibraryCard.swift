@@ -14,6 +14,9 @@ struct ThemeLibraryCard: View {
     let isActiveMode: (ThemeAppearance) -> Bool
     let onUse: () -> Void
     let onUseMode: (ThemeAppearance) -> Void
+    /// Whether this card is the user's saved theme, shown as a badge so a
+    /// custom theme named like a preset is distinguishable at a glance.
+    var isCustom = false
     var onEdit: (() -> Void)?
     var onExport: (() -> Void)?
     var onRemove: (() -> Void)?
@@ -106,6 +109,9 @@ struct ThemeLibraryCard: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            if isCustom {
+                customBadge
+            }
             if let onEdit {
                 ghostAction("pencil", label: "Edit theme") { onEdit() }
             }
@@ -119,6 +125,19 @@ struct ThemeLibraryCard: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, 12)
+    }
+
+    private var customBadge: some View {
+        Text("Custom")
+            .font(chrome.fonts.font(chrome.fonts.label, weight: .medium))
+            .foregroundColor(chrome.palette.mutedForeground)
+            .padding(.horizontal, 6)
+            .frame(height: 18)
+            .background(
+                RoundedRectangle(cornerRadius: chrome.radius.sm)
+                    .fill(chrome.palette.secondary.opacity(0.9))
+            )
+            .accessibilityHidden(true)
     }
 
     private func ghostAction(_ systemImage: String, label: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
