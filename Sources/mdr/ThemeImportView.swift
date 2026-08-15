@@ -17,7 +17,6 @@ struct ThemeImportView: View {
     @State private var fileName: String?
     @State private var errorMessage: String?
     @State private var isDropTarget = false
-    @State private var isChooseHovering = false
     @State private var isCancelHovering = false
 
     /// Theme files are a few KB; anything larger is not a theme file.
@@ -130,19 +129,7 @@ struct ThemeImportView: View {
                     .truncationMode(.middle)
             }
             Spacer()
-            Button("Choose files", action: chooseFiles)
-                .buttonStyle(.plain)
-                .font(chrome.fonts.font(chrome.fonts.caption, weight: .medium))
-                .foregroundColor(chrome.palette.foreground)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isChooseHovering ? chrome.palette.accent.opacity(0.1) : .clear)
-                )
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(chrome.palette.border.opacity(0.7), lineWidth: 1))
-                .contentShape(Rectangle())
-                .onHover { isChooseHovering = $0 }
+            OutlinedButton(chrome: chrome, title: "Choose files", action: chooseFiles)
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(chrome.palette.secondary.opacity(0.2)))

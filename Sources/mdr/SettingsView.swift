@@ -66,6 +66,8 @@ struct SettingsView: View {
                         onSave: saveEditorDraft,
                         onClose: closeEditor
                     )
+                    .id(session.id)
+                    .offset(editorDragOffset)
                     .padding(16)
                     .zIndex(10)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -87,6 +89,9 @@ struct SettingsView: View {
             .onExitCommand {
                 if editorSession != nil { closeEditor() }
             }
+        }
+        .onDisappear {
+            statusTask?.cancel()
         }
     }
 
@@ -199,8 +204,8 @@ struct SettingsView: View {
                 .tracking(-0.1)
                 .foregroundColor(chrome.palette.foreground)
             Spacer()
-            OutlinedActionButton(chrome: chrome, systemImage: "plus", title: "Create theme", action: createTheme)
-            OutlinedActionButton(chrome: chrome, systemImage: "square.and.arrow.down", title: "Import theme") {
+            OutlinedButton(chrome: chrome, systemImage: "plus", title: "Create theme", action: createTheme)
+            OutlinedButton(chrome: chrome, systemImage: "square.and.arrow.down", title: "Import theme") {
                 isShowingImport = true
             }
         }
@@ -328,8 +333,7 @@ struct SettingsView: View {
             onUseMode: { appearance in
                 applyTheme(preset.theme, message: "Applied \(preset.label) for \(appearance.rawValue) mode")
                 store.appearanceMode = appearance == .light ? .light : .dark
-            },
-            onDuplicate: { openEditor(seed: preset.theme, seedName: "\(preset.label) copy", isEditing: false) }
+            }
         )
     }
 
@@ -347,11 +351,8 @@ struct SettingsView: View {
             onUseMode: { appearance in
                 store.appearanceMode = appearance == .light ? .light : .dark
             },
-            onDuplicate: {
-                openEditor(seed: store.theme, seedName: "\(store.theme.label ?? "Custom theme") copy", isEditing: false)
-            },
             onEdit: {
-                openEditor(seed: store.theme, seedName: nil, isEditing: true)
+                openEditor(seed: store.theme, isEditing: true)
             },
             onExport: exportTheme,
             onRemove: { isConfirmingReset = true }
@@ -381,16 +382,16 @@ struct SettingsView: View {
     }
 
     private func createTheme() {
-        openEditor(seed: store.theme, seedName: nil, isEditing: false)
+        openEditor(seed: store.theme, isEditing: false)
     }
 
-    private func openEditor(seed: Theme, seedName: String?, isEditing: Bool) {
+    private func openEditor(seed: Theme, isEditing: Bool) {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             editorDragOffset = .zero
             editorSession = ThemeEditorSession(
                 id: UUID(),
                 isEditing: isEditing,
-                initialName: isEditing ? (seed.label ?? "") : (seedName ?? "")
+                initialName: isEditing ? (seed.label ?? "") : ""
             )
             draftValue = seed
         }
@@ -470,40 +471,5 @@ struct SettingsView: View {
     /// Keeps the editor's body within the window for any window size.
     private func editorBodyMaxHeight(in windowHeight: CGFloat) -> CGFloat {
         max(220, min(640, windowHeight - 190))
-    }
-}
-
-/// A small bordered action in the Themes header, with a hover state.
-private struct OutlinedActionButton: View {
-    let chrome: Theme
-    let systemImage: String
-    let title: String
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 10, weight: .semibold))
-                Text(title)
-                    .font(chrome.fonts.font(chrome.fonts.caption, weight: .medium))
-            }
-            .foregroundColor(chrome.palette.foreground)
-            .padding(.horizontal, 10)
-            .frame(height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHovering ? chrome.palette.accent.opacity(0.1) : .clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(chrome.palette.border.opacity(0.7), lineWidth: 1)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
     }
 }

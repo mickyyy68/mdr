@@ -143,9 +143,10 @@ public struct Radius: Equatable, Sendable {
 
 /// Typography tokens: an optional family plus named size roles.
 public struct FontConfig: Equatable, Sendable {
-    /// The font family to use. `nil` or `"Inter"` resolve to the per-weight
-    /// Inter names below (with a system fallback); any other installed family
-    /// is used directly with the requested weight.
+    /// The font family to use. `nil` resolves to the system font (SF Pro);
+    /// `"Inter"` — or any family the system can't load — resolves to the
+    /// per-weight Inter names below (with a system fallback); any other
+    /// installed family is used directly with the requested weight.
     public var family: String?
     public var heading1: CGFloat
     public var heading2: CGFloat
@@ -193,7 +194,7 @@ public struct FontConfig: Equatable, Sendable {
         if let family, family != "Inter", NSFont(name: family, size: size) != nil {
             return .custom(family, size: size).weight(weight)
         }
-        if Self.interAvailable, let name = Self.interNames[weight] {
+        if family != nil, Self.interAvailable, let name = Self.interNames[weight] {
             return .custom(name, size: size)
         }
         return .system(size: size, weight: weight)

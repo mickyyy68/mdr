@@ -14,7 +14,6 @@ struct ThemeLibraryCard: View {
     let isActiveMode: (ThemeAppearance) -> Bool
     let onUse: () -> Void
     let onUseMode: (ThemeAppearance) -> Void
-    var onDuplicate: (() -> Void)?
     var onEdit: (() -> Void)?
     var onExport: (() -> Void)?
     var onRemove: (() -> Void)?
@@ -107,14 +106,11 @@ struct ThemeLibraryCard: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            if let onDuplicate {
-                ghostAction("doc.on.doc", label: "Duplicate theme") { onDuplicate() }
-            }
             if let onEdit {
                 ghostAction("pencil", label: "Edit theme") { onEdit() }
             }
             if let onExport {
-                ghostAction("square.and.arrow.up", label: "Export theme file") { onExport() }
+                ghostAction("doc.on.clipboard", label: "Copy theme JSON to clipboard") { onExport() }
             }
             if let onRemove {
                 ghostAction("trash", label: "Remove theme", destructive: true) { onRemove() }

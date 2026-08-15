@@ -227,9 +227,9 @@ public struct Theme: Equatable, Sendable {
     private static func mergedFonts(_ override: FontOverride?, file: String?) throws -> FontConfig {
         guard let override else { return .linear }
         var fonts = FontConfig.linear
-        if let family = override.family {
-            fonts.family = family
-        }
+        // A missing or null `fonts.family` means the system font; only an
+        // explicit value overrides the Linear default.
+        fonts.family = override.family
         fonts.heading1 = try number(override.heading1, fallback: fonts.heading1, key: "fonts.heading1", file: file)
         fonts.heading2 = try number(override.heading2, fallback: fonts.heading2, key: "fonts.heading2", file: file)
         fonts.heading3 = try number(override.heading3, fallback: fonts.heading3, key: "fonts.heading3", file: file)

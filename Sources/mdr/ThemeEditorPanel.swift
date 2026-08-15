@@ -407,26 +407,69 @@ struct ThemeEditorPanel: View {
                 .font(chrome.fonts.font(chrome.fonts.body))
                 .foregroundColor(chrome.palette.mutedForeground)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("Inter", text: familyBinding)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(chrome.palette.foreground)
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.trailing)
+            Menu {
+                ForEach(Self.fontFamilies) { option in
+                    Button {
+                        draft.fonts.family = option.familyName
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(option.displayName)
+                                .font(option.familyName.map { Font.custom($0, size: 13) } ?? .system(size: 13))
+                            if isCurrent(option) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(chrome.palette.primary)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selectedFamilyName)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(chrome.palette.foreground)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundColor(chrome.palette.mutedForeground)
+                }
                 .padding(.horizontal, 8)
-                .frame(width: 112, height: 32)
+                .frame(width: 168, height: 32)
                 .background(chrome.palette.secondary.opacity(0.6))
                 .clipShape(RoundedRectangle(cornerRadius: chrome.radius.md))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .accessibilityLabel("Font family")
+            .fixedSize()
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
     }
 
-    private var familyBinding: Binding<String> {
-        Binding(
-            get: { draft.fonts.family ?? "" },
-            set: { draft.fonts.family = $0.isEmpty ? nil : $0 }
-        )
+    private func isCurrent(_ option: FontFamilyOption) -> Bool {
+        guard let family = draft.fonts.family else { return option.familyName == nil }
+        guard let optionFamily = option.familyName else { return false }
+        return optionFamily.caseInsensitiveCompare(family) == .orderedSame
     }
+
+    private var selectedFamilyName: String {
+        guard let family = draft.fonts.family else { return "System (SF Pro)" }
+        return Self.fontFamilies.first { isCurrent($0) }?.displayName ?? family
+    }
+
+    /// The font families the editor offers, filtered to what the renderer
+    /// can actually load (`FontConfig.font` gates on `NSFont(name:)`).
+    @MainActor
+    private static let fontFamilies: [FontFamilyOption] = {
+        let loadable = Set(
+            NSFontManager.shared.availableFontFamilies
+                .filter { NSFont(name: $0, size: 12) != nil }
+                .map { $0.lowercased() }
+        )
+        return FontFamilyCatalog.options(loadable: loadable)
+    }()
 
     // MARK: - Footer
 
