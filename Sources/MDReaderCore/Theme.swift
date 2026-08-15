@@ -1,6 +1,28 @@
 import Foundation
 import SwiftUI
 
+/// A theme's per-appearance palette.
+public enum ThemeAppearance: String, Codable, CaseIterable, Sendable {
+    case light
+    case dark
+}
+
+/// How the app picks an appearance: follow the system, or force one side.
+public enum ThemeAppearanceMode: String, Codable, CaseIterable, Sendable {
+    case system
+    case light
+    case dark
+
+    /// Resolves the effective appearance for a given system appearance.
+    public func appearance(systemAppearance: ThemeAppearance) -> ThemeAppearance {
+        switch self {
+        case .system: systemAppearance
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+}
+
 /// A fully-resolved set of design tokens.
 ///
 /// `Theme.linear` is the canonical Linear look. `load` / `resolve` build themes
@@ -8,12 +30,43 @@ import SwiftUI
 /// the seam where bundled preset themes can be introduced later (a preset is
 /// just a named override merged in before the user's file).
 public struct Theme: Equatable, Sendable {
+    /// The theme's name (shown in the Settings library).
+    public var label: String?
+    /// The base palette (dark). Serialized as `palette`; the historical schema
+    /// only had this one palette, so it stays the dark side for back-compat.
     public var palette: Palette
+    /// The light palette; falls back to `palette` when unset.
+    public var lightPalette: Palette?
     public var spacing: Spacing
     public var radius: Radius
     public var fonts: FontConfig
 
-    public static let linear = Theme(palette: .linear, spacing: .linear, radius: .linear, fonts: .linear)
+    public static let linear = Theme(
+        label: "Linear",
+        palette: .linear,
+        lightPalette: .linearLight,
+        spacing: .linear,
+        radius: .linear,
+        fonts: .linear
+    )
+
+    /// The palette for an appearance, falling back to the base palette.
+    public func palette(for appearance: ThemeAppearance) -> Palette {
+        appearance == .light ? (lightPalette ?? palette) : palette
+    }
+
+    /// The same theme with `palette` resolved to one appearance, so renderers
+    /// can treat the theme as single-palette.
+    public func resolved(for appearance: ThemeAppearance) -> Theme {
+        var resolved = self
+        resolved.palette = palette(for: appearance)
+        return resolved
+    }
+
+    /// Resolves the theme for an appearance mode.
+    public func resolved(for mode: ThemeAppearanceMode, systemAppearance: ThemeAppearance) -> Theme {
+        resolved(for: mode.appearance(systemAppearance: systemAppearance))
+    }
 
     /// Loads a theme from a JSON config file and merges it over the Linear defaults.
     public static func load(from url: URL) throws -> Theme {
@@ -33,16 +86,40 @@ public struct Theme: Equatable, Sendable {
         try apply(override, file: nil)
     }
 
+    /// Decodes and merges override JSON from data (used for paste-import).
+    /// `label` names the source in error messages. Rejects JSON that carries no
+    /// known theme keys so foreign formats (e.g. T3/VS Code files) fail loudly
+    /// instead of silently resolving to the default theme.
+    public static func merged(withData data: Data, label: String) throws -> Theme {
+        let override = try decode(data, file: label)
+        guard override.palette != nil || override.spacing != nil || override.radius != nil || override.fonts != nil || override.lightPalette != nil || override.label != nil else {
+            throw ThemeError.unsupportedFormat
+        }
+        return try apply(override, file: label)
+    }
+
+    /// Resolves the active theme and the file that produced it: an explicit
+    /// `--theme` wins, then the default config file when present, then Linear
+    /// defaults (source is `nil`).
+    public static func resolveWithSource(explicit: URL?, defaultFile: URL) throws -> (theme: Theme, source: URL?) {
+        if let explicit {
+            return (try load(from: explicit), explicit)
+        }
+        if FileManager.default.fileExists(atPath: defaultFile.path) {
+            return (try load(from: defaultFile), defaultFile)
+        }
+        return (.linear, nil)
+    }
+
     /// Resolves the active theme: an explicit `--theme` wins, then the default
     /// config file when present, then Linear defaults.
     public static func resolve(explicit: URL?, defaultFile: URL) throws -> Theme {
-        if let explicit {
-            return try load(from: explicit)
-        }
-        if FileManager.default.fileExists(atPath: defaultFile.path) {
-            return try load(from: defaultFile)
-        }
-        return .linear
+        try resolveWithSource(explicit: explicit, defaultFile: defaultFile).theme
+    }
+
+    /// Returns the named preset theme.
+    public static func preset(_ preset: ThemePreset) -> Theme {
+        preset.theme
     }
 
     /// Pretty-printed JSON of a fully-specified Linear theme, used to bootstrap
@@ -78,16 +155,32 @@ public struct Theme: Equatable, Sendable {
     // MARK: - Merging
 
     private static func apply(_ override: ThemeOverride, file: String?) throws -> Theme {
-        let palette = try mergedPalette(override.palette, file: file)
+        let palette = try mergedPalette(override.palette, base: .linear, file: file)
+        let lightPalette = try mergedLightPalette(override.lightPalette, file: file)
         let spacing = try mergedSpacing(override.spacing, file: file)
         let radius = try mergedRadius(override.radius, file: file)
         let fonts = try mergedFonts(override.fonts, file: file)
-        return Theme(palette: palette, spacing: spacing, radius: radius, fonts: fonts)
+        return Theme(
+            label: override.label ?? Theme.linear.label,
+            palette: palette,
+            lightPalette: lightPalette,
+            spacing: spacing,
+            radius: radius,
+            fonts: fonts
+        )
     }
 
-    private static func mergedPalette(_ override: PaletteOverride?, file: String?) throws -> Palette {
-        guard let override else { return .linear }
-        var palette = Palette.linear
+    /// Merges a `lightPalette` override over the Linear light defaults; `nil`
+    /// override keeps the Linear light palette (a theme without one falls back
+    /// to its base palette at resolution time).
+    private static func mergedLightPalette(_ override: PaletteOverride?, file: String?) throws -> Palette? {
+        guard let override else { return Theme.linear.lightPalette }
+        return try mergedPalette(override, base: Theme.linear.lightPalette ?? .linear, file: file)
+    }
+
+    private static func mergedPalette(_ override: PaletteOverride?, base: Palette, file: String?) throws -> Palette {
+        guard let override else { return base }
+        var palette = base
         palette.background = try color(override.background, fallback: palette.background, key: "palette.background", file: file)
         palette.foreground = try color(override.foreground, fallback: palette.foreground, key: "palette.foreground", file: file)
         palette.card = try color(override.card, fallback: palette.card, key: "palette.card", file: file)
@@ -169,18 +262,14 @@ public struct Theme: Equatable, Sendable {
 
     /// Parses `#RRGGBB` (the `#` is optional) into an sRGB hex value.
     private static func parseHex(_ hex: String) -> UInt32? {
-        var digits = hex
-        if digits.hasPrefix("#") {
-            digits.removeFirst()
-        }
-        guard digits.count == 6, digits.allSatisfy(\.isHexDigit) else { return nil }
-        return UInt32(digits, radix: 16)
+        Color.hexValue(hex)
     }
 
     // MARK: - Bootstrap
 
     /// A fully-specified Linear override, encoded by `defaultConfigData`.
     private static let defaultOverride = ThemeOverride(
+        label: "Linear",
         palette: PaletteOverride(
             background: "#191A24",
             foreground: "#FFFFFF",
@@ -201,6 +290,27 @@ public struct Theme: Equatable, Sendable {
             syntaxType: "#8B93E7",
             syntaxNumber: "#FBBF24",
             syntaxPlain: "#E5E7EB"
+        ),
+        lightPalette: PaletteOverride(
+            background: "#FFFFFF",
+            foreground: "#1F2023",
+            card: "#FAFAFB",
+            cardForeground: "#1F2023",
+            secondary: "#F1F1F4",
+            secondaryForeground: "#8A8F98",
+            muted: "#FAFAFB",
+            mutedForeground: "#8A8F98",
+            accent: "#F1F1F4",
+            accentForeground: "#1F2023",
+            primary: "#5E6AD2",
+            destructive: "#D60D45",
+            border: "#E2E2E8",
+            syntaxKeyword: "#5E6AD2",
+            syntaxString: "#0F766E",
+            syntaxComment: "#9CA3AF",
+            syntaxType: "#6D5AD8",
+            syntaxNumber: "#D97706",
+            syntaxPlain: "#374151"
         ),
         spacing: SpacingOverride(xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32),
         radius: RadiusOverride(sm: 4, md: 6, lg: 8),
@@ -226,16 +336,59 @@ public struct Theme: Equatable, Sendable {
 /// A partial theme config as written in `theme.json`; every field is optional
 /// and unspecified fields keep the Linear default.
 public struct ThemeOverride: Codable, Equatable, Sendable {
+    public var label: String?
     public var palette: PaletteOverride?
+    public var lightPalette: PaletteOverride?
     public var spacing: SpacingOverride?
     public var radius: RadiusOverride?
     public var fonts: FontOverride?
 
-    public init(palette: PaletteOverride? = nil, spacing: SpacingOverride? = nil, radius: RadiusOverride? = nil, fonts: FontOverride? = nil) {
+    public init(label: String? = nil, palette: PaletteOverride? = nil, lightPalette: PaletteOverride? = nil, spacing: SpacingOverride? = nil, radius: RadiusOverride? = nil, fonts: FontOverride? = nil) {
+        self.label = label
         self.palette = palette
+        self.lightPalette = lightPalette
         self.spacing = spacing
         self.radius = radius
         self.fonts = fonts
+    }
+}
+
+public extension ThemeOverride {
+    /// Serializes a fully-resolved theme back to a complete (all-keys) override,
+    /// so saving round-trips the config file format exactly. A theme without an
+    /// explicit light palette omits `lightPalette`, preserving the historical
+    /// palette-only file shape.
+    init(theme: Theme) {
+        label = theme.label
+        palette = PaletteOverride(palette: theme.palette)
+        lightPalette = theme.lightPalette.map(PaletteOverride.init(palette:))
+        spacing = SpacingOverride(
+            xs: theme.spacing.xs,
+            sm: theme.spacing.sm,
+            md: theme.spacing.md,
+            lg: theme.spacing.lg,
+            xl: theme.spacing.xl,
+            xxl: theme.spacing.xxl
+        )
+        radius = RadiusOverride(
+            sm: theme.radius.sm,
+            md: theme.radius.md,
+            lg: theme.radius.lg
+        )
+        fonts = FontOverride(
+            family: theme.fonts.family,
+            heading1: theme.fonts.heading1,
+            heading2: theme.fonts.heading2,
+            heading3: theme.fonts.heading3,
+            heading4: theme.fonts.heading4,
+            heading5: theme.fonts.heading5,
+            body: theme.fonts.body,
+            caption: theme.fonts.caption,
+            code: theme.fonts.code,
+            inlineCode: theme.fonts.inlineCode,
+            label: theme.fonts.label,
+            lineSpacing: theme.fonts.lineSpacing
+        )
     }
 }
 
@@ -288,6 +441,33 @@ public struct PaletteOverride: Codable, Equatable, Sendable {
         self.syntaxType = syntaxType
         self.syntaxNumber = syntaxNumber
         self.syntaxPlain = syntaxPlain
+    }
+}
+
+public extension PaletteOverride {
+    /// Serializes a fully-resolved palette (used by `ThemeOverride(theme:)`).
+    init(palette: Palette) {
+        self.init(
+            background: palette.background.hexString,
+            foreground: palette.foreground.hexString,
+            card: palette.card.hexString,
+            cardForeground: palette.cardForeground.hexString,
+            secondary: palette.secondary.hexString,
+            secondaryForeground: palette.secondaryForeground.hexString,
+            muted: palette.muted.hexString,
+            mutedForeground: palette.mutedForeground.hexString,
+            accent: palette.accent.hexString,
+            accentForeground: palette.accentForeground.hexString,
+            primary: palette.primary.hexString,
+            destructive: palette.destructive.hexString,
+            border: palette.border.hexString,
+            syntaxKeyword: palette.syntaxKeyword.hexString,
+            syntaxString: palette.syntaxString.hexString,
+            syntaxComment: palette.syntaxComment.hexString,
+            syntaxType: palette.syntaxType.hexString,
+            syntaxNumber: palette.syntaxNumber.hexString,
+            syntaxPlain: palette.syntaxPlain.hexString
+        )
     }
 }
 
@@ -363,6 +543,8 @@ public enum ThemeError: Error, Equatable {
     case invalidJSON(path: String)
     case invalidColor(key: String, value: String, path: String?)
     case invalidValue(key: String, value: String, path: String?)
+    case unsupportedFormat
+    case writeFailed(path: String, underlying: String)
 }
 
 extension ThemeError: LocalizedError {
@@ -376,10 +558,68 @@ extension ThemeError: LocalizedError {
             return "mdr: invalid color '\(value)' for \(key)\(pathSuffix(path))"
         case .invalidValue(let key, let value, let path):
             return "mdr: invalid value for \(key)\(pathSuffix(path)): \(value)"
+        case .unsupportedFormat:
+            return "mdr: unsupported theme format — expected a theme config with palette/spacing/radius/fonts keys"
+        case .writeFailed(let path, let underlying):
+            return "mdr: could not write '\(path)': \(underlying)"
         }
     }
 
     private func pathSuffix(_ path: String?) -> String {
         path.map { " in '\($0)'" } ?? ""
+    }
+}
+
+// MARK: - Presets
+
+/// The bundled theme presets shown in the Settings library. Plain cases only,
+/// so `CaseIterable` synthesizes `allCases` for the library grid.
+public enum ThemePreset: String, CaseIterable, Sendable {
+    case linear
+    case midnight
+    case forest
+    case ember
+
+    public var label: String {
+        switch self {
+        case .linear: "Linear"
+        case .midnight: "Midnight"
+        case .forest: "Forest"
+        case .ember: "Ember"
+        }
+    }
+
+    public var theme: Theme {
+        switch self {
+        case .linear:
+            .linear
+        case .midnight:
+            Theme(
+                label: "Midnight",
+                palette: PaletteDerivation.derive(background: Color(hex: 0x0B0E14), accent: Color(hex: 0x7C3AED)),
+                lightPalette: PaletteDerivation.derive(background: Color(hex: 0xF7F5FC), accent: Color(hex: 0x7C3AED)),
+                spacing: .linear,
+                radius: .linear,
+                fonts: .linear
+            )
+        case .forest:
+            Theme(
+                label: "Forest",
+                palette: PaletteDerivation.derive(background: Color(hex: 0x0A0F0D), accent: Color(hex: 0x34D399)),
+                lightPalette: PaletteDerivation.derive(background: Color(hex: 0xF0F9F4), accent: Color(hex: 0x10B981)),
+                spacing: .linear,
+                radius: .linear,
+                fonts: .linear
+            )
+        case .ember:
+            Theme(
+                label: "Ember",
+                palette: PaletteDerivation.derive(background: Color(hex: 0x120C0A), accent: Color(hex: 0xF97316)),
+                lightPalette: PaletteDerivation.derive(background: Color(hex: 0xFFF7F0), accent: Color(hex: 0xEA580C)),
+                spacing: .linear,
+                radius: .linear,
+                fonts: .linear
+            )
+        }
     }
 }

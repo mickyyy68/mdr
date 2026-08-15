@@ -11,15 +11,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private let documents: [DocumentLoader.LoadedDocument]
-    private let theme: Theme
+    private let store: ThemeStore
     private var windowRecords: [WindowRecord] = []
 
-    init(documents: [DocumentLoader.LoadedDocument], theme: Theme) {
+    init(documents: [DocumentLoader.LoadedDocument], store: ThemeStore) {
         self.documents = documents
-        self.theme = theme
+        self.store = store
+        super.init()
+        store.onThemeChange = { [weak self] _ in
+            self?.updateWindows()
+        }
+        store.onAppearanceModeChange = { [weak self] mode in
+            Self.persistAppearanceMode(mode)
+            self?.updateWindows()
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        store.appearanceMode = Self.loadAppearanceMode()
         configureMainMenu()
         for document in documents {
             openWindow(for: document)
@@ -36,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func openWindow(for document: DocumentLoader.LoadedDocument) {
         let model = ReaderViewModel()
         let hostingController = NSHostingController(
-            rootView: ReaderView(document: document, theme: theme, model: model)
+            rootView: ReaderView(document: document, store: store, model: model)
         )
         let window = NSWindow(contentViewController: hostingController)
         window.title = document.url.lastPathComponent
@@ -44,10 +53,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 900, height: 720))
         window.minSize = NSSize(width: 480, height: 360)
-        window.backgroundColor = NSColor(theme.palette.background)
         window.center()
         window.makeKeyAndOrderFront(nil)
         windowRecords.append(WindowRecord(window: window, model: model))
+        applyWindowStyle(window)
+    }
+
+    /// Keeps every window's background and `NSAppearance` aligned with the
+    /// resolved theme and appearance mode.
+    private func updateWindows() {
+        for record in windowRecords {
+            applyWindowStyle(record.window)
+        }
+    }
+
+    private func applyWindowStyle(_ window: NSWindow) {
+        window.backgroundColor = NSColor(store.resolvedTheme.palette.background)
+        window.appearance = Self.nsAppearance(for: store.appearanceMode)
+    }
+
+    // MARK: - Appearance persistence
+
+    private static let appearanceModeKey = "mdr:appearance-mode"
+
+    private static func loadAppearanceMode() -> ThemeAppearanceMode {
+        guard let raw = UserDefaults.standard.string(forKey: appearanceModeKey),
+              let mode = ThemeAppearanceMode(rawValue: raw) else { return .system }
+        return mode
+    }
+
+    private static func persistAppearanceMode(_ mode: ThemeAppearanceMode) {
+        UserDefaults.standard.set(mode.rawValue, forKey: appearanceModeKey)
+    }
+
+    /// The window `NSAppearance` for a mode: `nil` follows the system.
+    private static func nsAppearance(for mode: ThemeAppearanceMode) -> NSAppearance? {
+        switch mode {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
     }
 
     /// Shows the settings view in the key window. The Settings… menu item and

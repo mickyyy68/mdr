@@ -6,23 +6,23 @@ import SwiftUI
 @MainActor
 struct ReaderView: View {
     private let document: DocumentLoader.LoadedDocument
-    private let theme: Theme
+    @ObservedObject private var store: ThemeStore
     @ObservedObject private var model: ReaderViewModel
 
-    init(document: DocumentLoader.LoadedDocument, theme: Theme, model: ReaderViewModel) {
+    init(document: DocumentLoader.LoadedDocument, store: ThemeStore, model: ReaderViewModel) {
         self.document = document
-        self.theme = theme
+        self._store = ObservedObject(wrappedValue: store)
         self._model = ObservedObject(wrappedValue: model)
     }
 
     var body: some View {
         Group {
             if model.isShowingSettings {
-                SettingsView(configURL: CLI.defaultThemePath) {
+                SettingsView(configURL: CLI.defaultThemePath, store: store) {
                     model.isShowingSettings = false
                 }
             } else {
-                MarkdownReaderView(document: document, theme: theme)
+                MarkdownReaderView(document: document, theme: store.resolvedTheme)
                     .overlay(alignment: .topLeading) {
                         settingsButton
                     }
@@ -35,14 +35,14 @@ struct ReaderView: View {
             model.isShowingSettings = true
         } label: {
             Image(systemName: "gearshape")
-                .font(theme.fonts.font(theme.fonts.body))
-                .foregroundColor(theme.palette.mutedForeground)
+                .font(store.resolvedTheme.fonts.font(store.resolvedTheme.fonts.body))
+                .foregroundColor(store.resolvedTheme.palette.mutedForeground)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(theme.palette.secondary))
+                .background(Circle().fill(store.resolvedTheme.palette.secondary))
         }
         .buttonStyle(.plain)
         .help("Settings")
         .accessibilityLabel("Settings")
-        .padding(theme.spacing.lg)
+        .padding(store.resolvedTheme.spacing.lg)
     }
 }

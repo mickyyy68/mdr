@@ -8,7 +8,8 @@ Guidance for AI agents working in this repository.
 window rendering a markdown file. It reads one or more markdown files from disk
 and displays them with a dark design system inspired by Linear's design tokens.
 
-The app is deliberately small: it renders markdown, nothing more.
+The app is deliberately small: it renders markdown, nothing more. Appearance is
+configurable (design tokens, themes) — document content is not editable.
 
 ## Commands
 
@@ -28,11 +29,13 @@ Two targets with a single dependency direction:
 - `Sources/MDReaderCore/` — pure, testable logic exposed through a public API:
   - `DesignSystem.swift` — `Palette`, `Spacing`, `Radius`, `FontConfig` (Linear-sourced tokens)
   - `Theme.swift` — config-driven design tokens (`Theme`, `ThemeOverride`, `ThemeError`; `--theme` JSON overrides Linear defaults)
+  - `ColorDerivation.swift` — OKLCH color math and `PaletteDerivation` (guided two-color derivation)
+  - `ThemePersistence.swift` — theme config file save/delete/export
   - `CLI.swift` — argument parsing (`Command`, `CLIError`)
   - `DocumentLoader.swift` — file loading with UTF-8/16/Latin-1 fallback
   - `CodeHighlighter.swift` — scanner-based code tokenizer
   - `MarkdownRenderer.swift` — markdown AST → SwiftUI views (`MarkdownViewBuilder`, `MarkdownReaderView`)
-- `Sources/mdr/` — thin app shell: `MDReaderApp.swift` (`@main` entry point), `AppDelegate.swift` (windows, main menu), `SettingsView.swift` (design-token config window)
+- `Sources/mdr/` — thin app shell: `MDReaderApp.swift` (`@main` entry point), `AppDelegate.swift` (windows, main menu), `ThemeStore.swift` (session theme), `ReaderView.swift` (window root), `SettingsView.swift` (theme library + editor), `ColorPicker.swift` (token fields), `ThemeImportView.swift` (paste-JSON import)
 - `Tests/mdrTests/` — swift-testing unit tests for core logic
 
 Dependency rule: pure logic belongs in `MDReaderCore`; AppKit/UI glue belongs in
@@ -46,11 +49,13 @@ core; everything else stays `internal`.
 - Follow existing style: enums as namespaces, switch-based dispatch, explicit
   access modifiers, minimal comments.
 - Keep the executable thin. New logic goes into `MDReaderCore` with tests.
-- No scope creep: mdr is a reader, not an editor. Do not add unrequested
-  features, options, or infrastructure.
+- No scope creep: mdr is a reader, not a document editor. It does not edit
+  markdown content; appearance configuration (the theme editor in Settings) is
+  in scope. Do not add unrequested features, options, or infrastructure.
 - Match the existing design system when extending UI; keep the dark, Linear-based look.
 - Errors are `LocalizedError`, reported to stderr with an `mdr:` prefix, exiting
-  nonzero on failure.
+  nonzero on failure. Interactive settings errors render inline instead of
+  exiting — that divergence is deliberate.
 - Only commit when asked. Do not create documentation files (README, etc.)
   unless asked. No emojis.
 
@@ -63,5 +68,6 @@ core; everything else stays `internal`.
   - Parsing and rendering run synchronously on the main thread; fine for typical
     files, but very large files will lag.
   - Images load synchronously from disk or URL.
-  - Dark theme only; no theme switching.
+  - Dark-first design; a theme may specify a light palette, but there is no
+    appearance-mode switching (System/Light/Dark).
   - No editing, search, or table-of-contents features.

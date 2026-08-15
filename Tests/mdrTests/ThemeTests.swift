@@ -6,9 +6,74 @@ import Testing
 struct ThemeTests {
     @Test func linearMatchesDefaults() {
         #expect(Theme.linear.palette == Palette.linear)
+        #expect(Theme.linear.lightPalette == Palette.linearLight)
         #expect(Theme.linear.spacing == Spacing.linear)
         #expect(Theme.linear.radius == Radius.linear)
         #expect(Theme.linear.fonts == FontConfig.linear)
+    }
+
+    @Test func appearanceModeResolvesAgainstSystem() {
+        #expect(ThemeAppearanceMode.system.appearance(systemAppearance: .light) == .light)
+        #expect(ThemeAppearanceMode.system.appearance(systemAppearance: .dark) == .dark)
+        #expect(ThemeAppearanceMode.light.appearance(systemAppearance: .dark) == .light)
+        #expect(ThemeAppearanceMode.dark.appearance(systemAppearance: .light) == .dark)
+    }
+
+    @Test func paletteForAppearanceSelectsVariant() {
+        let theme = Theme(
+            label: "Test",
+            palette: .linear,
+            lightPalette: .linearLight,
+            spacing: .linear,
+            radius: .linear,
+            fonts: .linear
+        )
+        #expect(theme.palette(for: .dark) == Palette.linear)
+        #expect(theme.palette(for: .light) == Palette.linearLight)
+    }
+
+    @Test func paletteForLightFallsBackToBase() {
+        var theme = Theme.linear
+        theme.lightPalette = nil
+        #expect(theme.palette(for: .light) == theme.palette)
+    }
+
+    @Test func resolvedThemePinsOneAppearance() {
+        let theme = Theme(
+            label: "Test",
+            palette: .linear,
+            lightPalette: .linearLight,
+            spacing: .linear,
+            radius: .linear,
+            fonts: .linear
+        )
+        let light = theme.resolved(for: .light)
+        #expect(light.palette == Palette.linearLight)
+        #expect(light.spacing == Spacing.linear)
+        let dark = theme.resolved(for: .dark)
+        #expect(dark.palette == Palette.linear)
+    }
+
+    @Test func mergedLightPaletteOverridesDefaults() throws {
+        let theme = try Theme.merged(with: ThemeOverride(lightPalette: PaletteOverride(primary: "#7C3AED")))
+        #expect(theme.lightPalette?.primary == Color(hex: 0x7C3AED))
+        #expect(theme.lightPalette?.background == Palette.linearLight.background)
+    }
+
+    @Test func mergedLabelOverridesDefaults() throws {
+        let theme = try Theme.merged(with: ThemeOverride(label: "Aurora"))
+        #expect(theme.label == "Aurora")
+        #expect(try Theme.merged(with: ThemeOverride()).label == "Linear")
+    }
+
+    @Test func paletteOnlyFileKeepsLightFallback() throws {
+        let url = try temporaryFile(content: Data(##"{"palette":{"primary":"#123456"}}"##.utf8))
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let theme = try Theme.load(from: url)
+        #expect(theme.palette.primary == Color(hex: 0x123456))
+        #expect(theme.lightPalette == Palette.linearLight)
+        #expect(theme.palette(for: .light) == Palette.linearLight)
     }
 
     @Test func mergedPartialOverrideKeepsDefaults() throws {

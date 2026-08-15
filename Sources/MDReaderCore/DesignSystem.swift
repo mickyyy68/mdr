@@ -57,6 +57,29 @@ public struct Palette: Equatable, Sendable {
         syntaxNumber: Color(hex: 0xFBBF24),
         syntaxPlain: Color(hex: 0xE5E7EB)
     )
+
+    /// The canonical Linear light palette (same roles, light polarity).
+    public static let linearLight = Palette(
+        background: Color(hex: 0xFFFFFF),
+        foreground: Color(hex: 0x1F2023),
+        card: Color(hex: 0xFAFAFB),
+        cardForeground: Color(hex: 0x1F2023),
+        secondary: Color(hex: 0xF1F1F4),
+        secondaryForeground: Color(hex: 0x8A8F98),
+        muted: Color(hex: 0xFAFAFB),
+        mutedForeground: Color(hex: 0x8A8F98),
+        accent: Color(hex: 0xF1F1F4),
+        accentForeground: Color(hex: 0x1F2023),
+        primary: Color(hex: 0x5E6AD2),
+        destructive: Color(hex: 0xD60D45),
+        border: Color(hex: 0xE2E2E8),
+        syntaxKeyword: Color(hex: 0x5E6AD2),
+        syntaxString: Color(hex: 0x0F766E),
+        syntaxComment: Color(hex: 0x9CA3AF),
+        syntaxType: Color(hex: 0x6D5AD8),
+        syntaxNumber: Color(hex: 0xD97706),
+        syntaxPlain: Color(hex: 0x374151)
+    )
 }
 
 public extension Color {
@@ -68,6 +91,32 @@ public extension Color {
             blue: Double(hex & 0xFF) / 255,
             opacity: 1
         )
+    }
+
+    /// The color as an `#RRGGBB` sRGB hex string, via an explicit sRGB
+    /// conversion so the result is byte-exact regardless of the display.
+    var hexString: String {
+        guard let color = NSColor(self).usingColorSpace(.sRGB) else { return "#000000" }
+        let r = lround(Double(color.redComponent) * 255)
+        let g = lround(Double(color.greenComponent) * 255)
+        let b = lround(Double(color.blueComponent) * 255)
+        return String(format: "#%02X%02X%02X", UInt32(r), UInt32(g), UInt32(b))
+    }
+
+    /// Parses an `#RRGGBB` hex string (the `#` is optional) into an sRGB value.
+    static func hexValue(_ hexString: String) -> UInt32? {
+        var digits = hexString
+        if digits.hasPrefix("#") {
+            digits.removeFirst()
+        }
+        guard digits.count == 6, digits.allSatisfy(\.isHexDigit) else { return nil }
+        return UInt32(digits, radix: 16)
+    }
+
+    /// Creates a color from an `#RRGGBB` hex string; `nil` when malformed.
+    init?(hexString: String) {
+        guard let value = Self.hexValue(hexString) else { return nil }
+        self = Color(hex: value)
     }
 }
 
