@@ -2,22 +2,25 @@ import AppKit
 import MDReaderCore
 import SwiftUI
 
-/// A guidance window for the design-token config file. It does not edit tokens
+/// A guidance view for the design-token config file. It does not edit tokens
 /// itself; it points users at the config file so an AI assistant can edit it.
 struct SettingsView: View {
     private let configURL: URL
+    private let onBack: @MainActor () -> Void
     private let style = Theme.linear
 
     @State private var configExists = false
     @State private var configContent = ""
     @State private var errorMessage: String?
 
-    init(configURL: URL) {
+    init(configURL: URL, onBack: @escaping @MainActor () -> Void) {
         self.configURL = configURL
+        self.onBack = onBack
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: style.spacing.lg) {
+            backButton
             header
             Divider()
             guidance
@@ -32,12 +35,25 @@ struct SettingsView: View {
             jsonPreview
         }
         .padding(style.spacing.lg)
-        .frame(minWidth: 540, minHeight: 600, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(style.palette.background)
         .onAppear(perform: refresh)
     }
 
     // MARK: - Sections
+
+    private var backButton: some View {
+        Button(action: onBack) {
+            Image(systemName: "chevron.left")
+                .font(style.fonts.font(style.fonts.body))
+                .foregroundColor(style.palette.mutedForeground)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(style.palette.secondary))
+        }
+        .buttonStyle(.plain)
+        .help("Back to document")
+        .accessibilityLabel("Back")
+    }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: style.spacing.xs) {

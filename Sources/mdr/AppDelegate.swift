@@ -5,10 +5,14 @@ import SwiftUI
 /// Owns the application lifecycle, main menu, and reader windows.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private struct WindowRecord {
+        let window: NSWindow
+        let model: ReaderViewModel
+    }
+
     private let documents: [DocumentLoader.LoadedDocument]
     private let theme: Theme
-    private var windows: [NSWindow] = []
-    private var settingsWindow: NSWindow?
+    private var windowRecords: [WindowRecord] = []
 
     init(documents: [DocumentLoader.LoadedDocument], theme: Theme) {
         self.documents = documents
@@ -30,8 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Windows
 
     private func openWindow(for document: DocumentLoader.LoadedDocument) {
+        let model = ReaderViewModel()
         let hostingController = NSHostingController(
-            rootView: MarkdownReaderView(document: document, theme: theme)
+            rootView: ReaderView(document: document, theme: theme, model: model)
         )
         let window = NSWindow(contentViewController: hostingController)
         window.title = document.url.lastPathComponent
@@ -42,22 +47,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = NSColor(theme.palette.background)
         window.center()
         window.makeKeyAndOrderFront(nil)
-        windows.append(window)
+        windowRecords.append(WindowRecord(window: window, model: model))
     }
 
-    @objc private func openSettings(_ sender: Any?) {
-        if settingsWindow == nil {
-            let settingsView = SettingsView(configURL: CLI.defaultThemePath)
-            let hostingController = NSHostingController(rootView: settingsView)
-            let window = NSWindow(contentViewController: hostingController)
-            window.title = "\(CLI.name) Settings"
-            window.isReleasedWhenClosed = false
-            window.setContentSize(NSSize(width: 540, height: 600))
-            window.minSize = NSSize(width: 480, height: 480)
-            settingsWindow = window
-        }
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+    /// Shows the settings view in the key window. The Settings… menu item and
+    /// ⌘, land here; the in-view gear button updates its own model directly.
+    @objc private func showSettings(_ sender: Any?) {
+        guard let keyWindow = NSApp.keyWindow,
+              let record = windowRecords.first(where: { $0.window === keyWindow }) else { return }
+        record.model.isShowingSettings = true
     }
 
     // MARK: - Menu
@@ -76,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(.separator())
         appMenu.addItem(
             withTitle: "Settings…",
-            action: #selector(openSettings(_:)),
+            action: #selector(showSettings(_:)),
             keyEquivalent: ","
         )
         appMenu.addItem(.separator())
