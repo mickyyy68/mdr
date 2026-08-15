@@ -15,13 +15,13 @@ extension CLIError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .unknownOption(let option):
-            return "mdreader: unknown option '\(option)'"
+            return "mdr: unknown option '\(option)'"
         }
     }
 }
 
 public enum CLI {
-    public static let name = "mdreader"
+    public static let name = "mdr"
     public static let version = "1.0.0"
 
     public static let usage = """

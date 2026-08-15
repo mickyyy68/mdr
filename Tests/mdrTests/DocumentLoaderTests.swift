@@ -35,7 +35,7 @@ struct DocumentLoaderTests {
 
     private func temporaryFile(content: Data) throws -> URL {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("mdreader-test-\(UUID().uuidString).md")
+            .appendingPathComponent("mdr-test-\(UUID().uuidString).md")
         try content.write(to: url)
         return url
     }

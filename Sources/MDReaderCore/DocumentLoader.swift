@@ -18,7 +18,7 @@ public enum DocumentLoader {
         public var errorDescription: String? {
             switch self {
             case .unreadable(let url):
-                return "mdreader: cannot read '\(url.path)'"
+                return "mdr: cannot read '\(url.path)'"
             }
         }
     }

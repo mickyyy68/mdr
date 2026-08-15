@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "mdreader",
+    name: "mdr",
     platforms: [
         .macOS(.v13)
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0")
+        .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.8.0")
     ],
     targets: [
         .target(
@@ -17,11 +17,11 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "mdreader",
+            name: "mdr",
             dependencies: ["MDReaderCore"]
         ),
         .testTarget(
-            name: "mdreaderTests",
+            name: "mdrTests",
             dependencies: ["MDReaderCore"]
         )
     ]
