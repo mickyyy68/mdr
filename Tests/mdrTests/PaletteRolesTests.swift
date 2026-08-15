@@ -27,12 +27,14 @@ struct PaletteRolesTests {
         #expect(colorRoles == 19)
     }
 
-    @Test func familyRoleExistsExactlyOnce() {
+    @Test func familyRoleIsTheSingleFamilyRole() {
         let familyRoles = PaletteRoleGroup.allCases.flatMap(\.roles).filter { role in
             if case .family = role.kind { return true }
             return false
         }
         #expect(familyRoles.count == 1)
+        #expect(familyRoles[0].id == "family")
+        #expect(familyRoles[0].label == "Font family")
     }
 
     @Test func allGroupsAreNonEmpty() {

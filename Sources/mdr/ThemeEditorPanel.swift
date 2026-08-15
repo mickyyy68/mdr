@@ -310,19 +310,20 @@ struct ThemeEditorPanel: View {
 
     private var guidedFields: some View {
         VStack(spacing: 0) {
-            guidedColorField("Background", \.background)
-            guidedColorField("Accent", \.primary)
+            guidedColorField(PaletteRole("background", "Background", .color(\.background)))
+            guidedColorField(PaletteRole("primary", "Accent", .color(\.primary)))
         }
     }
 
-    private func guidedColorField(_ label: String, _ keyPath: WritableKeyPath<Palette, Color>) -> some View {
-        ColorField(
+    private func guidedColorField(_ role: PaletteRole) -> some View {
+        let keyPath = role.keyPath!
+        return ColorField(
             chrome: chrome,
-            label: label,
+            label: role.label,
             color: currentPalette[keyPath: keyPath],
             selected: selectedRole?.keyPath == keyPath
         ) {
-            selectedRole = PaletteRole("guided-\(label.lowercased())", label, .color(keyPath))
+            selectedRole = role
         } onChange: { color in
             var palette = currentPalette
             palette[keyPath: keyPath] = color
@@ -407,16 +408,16 @@ struct ThemeEditorPanel: View {
                     draft.radius[keyPath: keyPath] = newValue
                 }
             case .family:
-                familyField
+                familyField(label: role.label)
             case .color:
                 EmptyView()
             }
         }
     }
 
-    private var familyField: some View {
+    private func familyField(label: String) -> some View {
         HStack(spacing: 8) {
-            Text("Font family")
+            Text(label)
                 .font(chrome.fonts.font(chrome.fonts.body))
                 .foregroundColor(chrome.palette.mutedForeground)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -454,7 +455,7 @@ struct ThemeEditorPanel: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .accessibilityLabel("Font family")
+            .accessibilityLabel(label)
             .fixedSize()
         }
         .padding(.horizontal, 8)
@@ -566,7 +567,8 @@ struct ThemeEditorPanel: View {
         NSColorSampler().show { sampled in
             guard let sampled else { return }
             Task { @MainActor in
-                let role = selectedRole ?? PaletteRoleGroup.allCases.flatMap(\.roles).first { $0.label == "Accent" }
+                let fallbackID = isAdvanced ? "accent" : "primary"
+                let role = selectedRole ?? PaletteRoleGroup.allCases.flatMap(\.roles).first { $0.id == fallbackID }
                 guard let role, let keyPath = role.keyPath else { return }
                 selectedRole = role
                 var palette = currentPalette
