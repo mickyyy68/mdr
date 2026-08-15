@@ -32,6 +32,7 @@ Two targets with a single dependency direction:
   - `ColorDerivation.swift` — OKLCH color math and `PaletteDerivation` (guided two-color derivation)
   - `ThemePersistence.swift` — theme config file save/delete/export
   - `FontFamilyCatalog.swift` — curated font-family options for the editor
+  - `PaletteRoles.swift` — advanced editor token roles (`PaletteRole`, `PaletteRoleGroup`)
   - `CLI.swift` — argument parsing (`Command`, `CLIError`)
   - `DocumentLoader.swift` — file loading with UTF-8/16/Latin-1 fallback
   - `CodeHighlighter.swift` — scanner-based code tokenizer
