@@ -11,11 +11,14 @@ struct ThemeImportView: View {
     @ObservedObject var store: ThemeStore
     let configURL: URL
     @Binding var isPresented: Bool
+    let onImported: (String) -> Void
 
     @State private var json = ""
     @State private var fileName: String?
     @State private var errorMessage: String?
     @State private var isDropTarget = false
+    @State private var isChooseHovering = false
+    @State private var isCancelHovering = false
 
     /// Theme files are a few KB; anything larger is not a theme file.
     private static let maxThemeFileBytes = 256 * 1024
@@ -67,7 +70,12 @@ struct ThemeImportView: View {
                 .foregroundColor(chrome.palette.foreground)
                 .padding(.horizontal, 12)
                 .frame(height: 30)
-                .background(RoundedRectangle(cornerRadius: 6).fill(.clear))
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isCancelHovering ? chrome.palette.accent.opacity(0.1) : .clear)
+                )
+                .contentShape(Rectangle())
+                .onHover { isCancelHovering = $0 }
                 Button(action: addTheme) {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
@@ -88,6 +96,9 @@ struct ThemeImportView: View {
         .padding(24)
         .frame(width: 560)
         .background(chrome.palette.background)
+        .onExitCommand {
+            isPresented = false
+        }
         .onAppear {
             json = ""
             fileName = nil
@@ -125,8 +136,13 @@ struct ThemeImportView: View {
                 .foregroundColor(chrome.palette.foreground)
                 .padding(.horizontal, 10)
                 .frame(height: 28)
-                .background(RoundedRectangle(cornerRadius: 6).fill(.clear))
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isChooseHovering ? chrome.palette.accent.opacity(0.1) : .clear)
+                )
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(chrome.palette.border.opacity(0.7), lineWidth: 1))
+                .contentShape(Rectangle())
+                .onHover { isChooseHovering = $0 }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(chrome.palette.secondary.opacity(0.2)))
@@ -137,6 +153,7 @@ struct ThemeImportView: View {
                     style: StrokeStyle(lineWidth: 1, dash: [5, 4])
                 )
         )
+        .animation(.easeInOut(duration: 0.15), value: isDropTarget)
         .onDrop(of: [UTType.fileURL], isTargeted: $isDropTarget) { providers in
             readDroppedFiles(providers)
             return true
@@ -197,6 +214,7 @@ struct ThemeImportView: View {
             try ThemePersistence.save(theme, to: target)
             store.sourceURL = target
             store.theme = theme
+            onImported(theme.label ?? fileName ?? "Theme")
             isPresented = false
         } catch {
             errorMessage = error.localizedDescription

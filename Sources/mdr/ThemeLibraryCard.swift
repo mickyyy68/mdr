@@ -20,6 +20,7 @@ struct ThemeLibraryCard: View {
     var onRemove: (() -> Void)?
 
     @State private var isHovering = false
+    @State private var hoveredAppearance: ThemeAppearance?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,7 +51,8 @@ struct ThemeLibraryCard: View {
     }
 
     private func modeBall(_ appearance: ThemeAppearance) -> some View {
-        Button {
+        let isActive = isActiveMode(appearance)
+        return Button {
             onUseMode(appearance)
         } label: {
             ZStack {
@@ -58,10 +60,11 @@ struct ThemeLibraryCard: View {
                     colors: ThemePreviewRoles(theme: theme, appearance: appearance),
                     appearance: appearance
                 )
-                if isActiveMode(appearance) {
+                if isActive {
                     Circle()
                         .stroke(chrome.palette.primary.opacity(0.9), lineWidth: 2)
                         .frame(width: 60, height: 60)
+                        .transition(.opacity)
                     Circle()
                         .fill(chrome.palette.background)
                         .frame(width: 20, height: 20)
@@ -72,11 +75,22 @@ struct ThemeLibraryCard: View {
                                 .foregroundColor(chrome.palette.foreground)
                         }
                         .offset(x: 22, y: 22)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
             .frame(width: 68, height: 68)
+            .scaleEffect(hoveredAppearance == appearance ? 1.08 : 1)
         }
         .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hoveredAppearance)
+        .animation(.easeOut(duration: 0.15), value: isActive)
+        .onHover { hovering in
+            if hovering {
+                hoveredAppearance = appearance
+            } else if hoveredAppearance == appearance {
+                hoveredAppearance = nil
+            }
+        }
         .help("Use for \(appearance.rawValue) mode only")
         .accessibilityLabel("Use \(label) \(appearance.rawValue) mode")
     }
@@ -112,15 +126,49 @@ struct ThemeLibraryCard: View {
     }
 
     private func ghostAction(_ systemImage: String, label: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+        GhostActionButton(
+            chrome: chrome,
+            systemImage: systemImage,
+            label: label,
+            destructive: destructive,
+            action: action
+        )
+    }
+}
+
+/// A 24pt ghost icon button with a hover highlight, as in the card footer.
+private struct GhostActionButton: View {
+    let chrome: Theme
+    let systemImage: String
+    let label: String
+    var destructive = false
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(destructive ? chrome.palette.destructive : chrome.palette.mutedForeground)
+                .foregroundColor(
+                    isHovering
+                        ? (destructive ? chrome.palette.destructive : chrome.palette.foreground)
+                        : chrome.palette.mutedForeground
+                )
                 .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            isHovering
+                                ? (destructive ? chrome.palette.destructive.opacity(0.15) : chrome.palette.accent.opacity(0.1))
+                                : .clear
+                        )
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(label)
         .accessibilityLabel(label)
+        .onHover { isHovering = $0 }
     }
 }

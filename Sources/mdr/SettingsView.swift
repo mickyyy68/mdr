@@ -19,6 +19,9 @@ struct SettingsView: View {
     @State private var statusMessage: String?
     @State private var errorMessage: String?
     @State private var editorDragOffset: CGSize = .zero
+    @State private var hoveredMode: ThemeAppearanceMode?
+    @State private var isBackHovering = false
+    @State private var statusTask: Task<Void, Never>?
 
     init(configURL: URL, store: ThemeStore, onBack: @escaping @MainActor () -> Void) {
         self.configURL = configURL
@@ -41,39 +44,49 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            HStack(spacing: 0) {
-                sidebar
-                Rectangle()
-                    .fill(chrome.palette.border.opacity(0.7))
-                    .frame(width: 1)
-                content
+        GeometryReader { geo in
+            ZStack(alignment: .bottomTrailing) {
+                HStack(spacing: 0) {
+                    sidebar
+                    Rectangle()
+                        .fill(chrome.palette.border.opacity(0.7))
+                        .frame(width: 1)
+                    content
+                }
+                .background(chrome.palette.background)
+                if let session = editorSession {
+                    ThemeEditorPanel(
+                        draft: editorDraftBinding,
+                        chrome: chrome,
+                        session: session,
+                        initialAppearance: store.effectiveAppearance,
+                        dragOffset: $editorDragOffset,
+                        dragBounds: CGSize(width: geo.size.width, height: geo.size.height),
+                        bodyMaxHeight: editorBodyMaxHeight(in: geo.size.height),
+                        onSave: saveEditorDraft,
+                        onClose: closeEditor
+                    )
+                    .padding(16)
+                    .zIndex(10)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
-            .background(chrome.palette.background)
-            if let session = editorSession {
-                ThemeEditorPanel(
-                    draft: editorDraftBinding,
-                    chrome: chrome,
-                    session: session,
-                    initialAppearance: store.effectiveAppearance,
-                    onSave: saveEditorDraft,
-                    onClose: closeEditor
-                )
-                .offset(editorDragOffset)
-                .padding(16)
-                .zIndex(10)
+            .confirmationDialog("Reset the theme?", isPresented: $isConfirmingReset) {
+                Button("Reset", role: .destructive) {
+                    resetTheme()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("mdr goes back to the Linear defaults. You can bring your theme back by importing its JSON file.")
             }
-        }
-        .confirmationDialog("Reset the theme?", isPresented: $isConfirmingReset) {
-            Button("Reset", role: .destructive) {
-                resetTheme()
+            .sheet(isPresented: $isShowingImport) {
+                ThemeImportView(store: store, configURL: configURL, isPresented: $isShowingImport) { message in
+                    showStatus(message)
+                }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("mdr goes back to the Linear defaults. You can bring your theme back by importing its JSON file.")
-        }
-        .sheet(isPresented: $isShowingImport) {
-            ThemeImportView(store: store, configURL: configURL, isPresented: $isShowingImport)
+            .onExitCommand {
+                if editorSession != nil { closeEditor() }
+            }
         }
     }
 
@@ -94,9 +107,14 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .frame(height: 34)
+                .background(
+                    RoundedRectangle(cornerRadius: chrome.radius.md)
+                        .fill(isBackHovering ? chrome.palette.accent.opacity(0.1) : .clear)
+                )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { isBackHovering = $0 }
             .help("Back to the document")
             .padding(8)
         }
@@ -123,18 +141,20 @@ struct SettingsView: View {
 
     private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                Text("Appearance")
-                    .font(chrome.fonts.font(20, weight: .semibold))
-                    .tracking(-0.5)
-                    .foregroundColor(chrome.palette.foreground)
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Appearance")
+                        .font(chrome.fonts.font(20, weight: .semibold))
+                        .tracking(-0.5)
+                        .foregroundColor(chrome.palette.foreground)
 
-                VStack(alignment: .leading, spacing: 12) {
                     Text("Choose how \(CLI.name) looks. Use a built-in theme or make your own.")
                         .font(chrome.fonts.font(13))
                         .foregroundColor(chrome.palette.mutedForeground.opacity(0.8))
                         .padding(.horizontal, 12)
+                }
 
+                VStack(alignment: .leading, spacing: 12) {
                     Text("Color scheme")
                         .font(chrome.fonts.font(chrome.fonts.body, weight: .medium))
                         .tracking(-0.1)
@@ -145,18 +165,21 @@ struct SettingsView: View {
 
                     themesHeader
 
-                    if let statusMessage {
-                        Text(statusMessage)
-                            .font(chrome.fonts.font(chrome.fonts.caption))
-                            .foregroundColor(chrome.palette.mutedForeground)
-                            .padding(.horizontal, 12)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let statusMessage {
+                            Text(statusMessage)
+                                .font(chrome.fonts.font(chrome.fonts.caption))
+                                .foregroundColor(chrome.palette.mutedForeground)
+                                .transition(.opacity)
+                        }
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(chrome.fonts.font(chrome.fonts.caption))
+                                .foregroundColor(chrome.palette.destructive)
+                                .transition(.opacity)
+                        }
                     }
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(chrome.fonts.font(chrome.fonts.caption))
-                            .foregroundColor(chrome.palette.destructive)
-                            .padding(.horizontal, 12)
-                    }
+                    .frame(minHeight: 18, alignment: .topLeading)
 
                     themeGrid
                 }
@@ -176,34 +199,10 @@ struct SettingsView: View {
                 .tracking(-0.1)
                 .foregroundColor(chrome.palette.foreground)
             Spacer()
-            Button(action: createTheme) {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("Create theme")
-                        .font(chrome.fonts.font(chrome.fonts.caption, weight: .medium))
-                }
-                .foregroundColor(chrome.palette.foreground)
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background(RoundedRectangle(cornerRadius: 6).fill(.clear))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(chrome.palette.border.opacity(0.7), lineWidth: 1))
+            OutlinedActionButton(chrome: chrome, systemImage: "plus", title: "Create theme", action: createTheme)
+            OutlinedActionButton(chrome: chrome, systemImage: "square.and.arrow.down", title: "Import theme") {
+                isShowingImport = true
             }
-            .buttonStyle(.plain)
-            Button(action: { isShowingImport = true }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("Import theme")
-                        .font(chrome.fonts.font(chrome.fonts.caption, weight: .medium))
-                }
-                .foregroundColor(chrome.palette.foreground)
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background(RoundedRectangle(cornerRadius: 6).fill(.clear))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(chrome.palette.border.opacity(0.7), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
@@ -222,6 +221,7 @@ struct SettingsView: View {
 
     private func modeTile(_ mode: ThemeAppearanceMode) -> some View {
         let isActive = store.appearanceMode == mode
+        let isHovering = hoveredMode == mode
         return Button {
             store.appearanceMode = mode
         } label: {
@@ -235,7 +235,11 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isActive ? chrome.palette.accent.opacity(0.3) : chrome.palette.card.opacity(0.6))
+                    .fill(
+                        isActive
+                            ? chrome.palette.accent.opacity(0.3)
+                            : (isHovering ? chrome.palette.accent.opacity(0.1) : chrome.palette.card.opacity(0.6))
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -247,6 +251,15 @@ struct SettingsView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.12), value: isActive)
+        .animation(.easeOut(duration: 0.12), value: isHovering)
+        .onHover { hovering in
+            if hovering {
+                hoveredMode = mode
+            } else if hoveredMode == mode {
+                hoveredMode = nil
+            }
+        }
         .help(mode == .system ? "Follow the system appearance" : "Use \(mode.rawValue) mode")
         .accessibilityLabel(mode == .system ? "Follow the system appearance" : "Use \(mode.rawValue) mode")
     }
@@ -361,11 +374,9 @@ struct SettingsView: View {
             try ThemePersistence.save(theme, to: target)
             store.sourceURL = target
             store.theme = theme
-            statusMessage = message
-            errorMessage = nil
+            showStatus(message)
         } catch {
-            errorMessage = error.localizedDescription
-            statusMessage = nil
+            showError(error.localizedDescription)
         }
     }
 
@@ -374,17 +385,21 @@ struct SettingsView: View {
     }
 
     private func openEditor(seed: Theme, seedName: String?, isEditing: Bool) {
-        editorDragOffset = .zero
-        editorSession = ThemeEditorSession(
-            id: UUID(),
-            isEditing: isEditing,
-            initialName: isEditing ? (seed.label ?? "") : (seedName ?? "")
-        )
-        draftValue = seed
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            editorDragOffset = .zero
+            editorSession = ThemeEditorSession(
+                id: UUID(),
+                isEditing: isEditing,
+                initialName: isEditing ? (seed.label ?? "") : (seedName ?? "")
+            )
+            draftValue = seed
+        }
     }
 
     private func closeEditor() {
-        editorSession = nil
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            editorSession = nil
+        }
     }
 
     private func saveEditorDraft(_ theme: Theme) throws {
@@ -392,9 +407,10 @@ struct SettingsView: View {
         try ThemePersistence.save(theme, to: target)
         store.sourceURL = target
         store.theme = theme
-        editorSession = nil
-        statusMessage = "\(theme.label ?? "Theme") saved"
-        errorMessage = nil
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            editorSession = nil
+        }
+        showStatus("\(theme.label ?? "Theme") saved")
     }
 
     private func resetTheme() {
@@ -402,14 +418,13 @@ struct SettingsView: View {
             do {
                 try ThemePersistence.delete(at: source)
             } catch {
-                errorMessage = error.localizedDescription
+                showError(error.localizedDescription)
                 return
             }
         }
         store.sourceURL = nil
         store.theme = .linear
-        statusMessage = "Reset to defaults"
-        errorMessage = nil
+        showStatus("Reset to defaults")
     }
 
     private func exportTheme() {
@@ -419,11 +434,76 @@ struct SettingsView: View {
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(json, forType: .string)
-            statusMessage = "Theme JSON copied to clipboard"
-            errorMessage = nil
+            showStatus("Theme JSON copied to clipboard")
         } catch {
-            errorMessage = error.localizedDescription
+            showError(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Feedback
+
+    /// Shows a transient status; success feedback dismisses itself like a toast.
+    private func showStatus(_ message: String) {
+        statusTask?.cancel()
+        withAnimation(.easeOut(duration: 0.2)) {
+            statusMessage = message
+            errorMessage = nil
+        }
+        statusTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.2)) {
+                statusMessage = nil
+            }
+        }
+    }
+
+    /// Shows a persistent error; it clears on the next action.
+    private func showError(_ message: String) {
+        statusTask?.cancel()
+        withAnimation(.easeOut(duration: 0.2)) {
+            errorMessage = message
             statusMessage = nil
         }
+    }
+
+    /// Keeps the editor's body within the window for any window size.
+    private func editorBodyMaxHeight(in windowHeight: CGFloat) -> CGFloat {
+        max(220, min(640, windowHeight - 190))
+    }
+}
+
+/// A small bordered action in the Themes header, with a hover state.
+private struct OutlinedActionButton: View {
+    let chrome: Theme
+    let systemImage: String
+    let title: String
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(title)
+                    .font(chrome.fonts.font(chrome.fonts.caption, weight: .medium))
+            }
+            .foregroundColor(chrome.palette.foreground)
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovering ? chrome.palette.accent.opacity(0.1) : .clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(chrome.palette.border.opacity(0.7), lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
     }
 }

@@ -66,7 +66,7 @@ struct HexField: View {
     let onChange: (Color) -> Void
 
     @State private var hexText: String
-    @State private var isEditing = false
+    @FocusState private var isFocused: Bool
 
     init(chrome: Theme, label: String, color: Color, onChange: @escaping (Color) -> Void) {
         self.chrome = chrome
@@ -86,12 +86,11 @@ struct HexField: View {
                 .foregroundColor(chrome.palette.foreground)
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.trailing)
+                .focused($isFocused)
                 .onSubmit(commit)
                 .onChange(of: hexText) { newValue in
-                    guard isEditing else { return }
-                    if let parsed = Color(hexString: newValue) {
-                        onChange(parsed)
-                    }
+                    guard isFocused, let parsed = Color(hexString: newValue) else { return }
+                    onChange(parsed)
                 }
         }
         .padding(.horizontal, 8)
@@ -99,11 +98,12 @@ struct HexField: View {
         .background(chrome.palette.secondary.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: chrome.radius.md))
         .onChange(of: color) { newColor in
-            guard !isEditing else { return }
+            guard !isFocused else { return }
             hexText = newColor.hexString
         }
-        .onTapGesture { isEditing = true }
-        .onAppear { isEditing = false }
+        .onChange(of: isFocused) { focused in
+            if !focused { commit() }
+        }
     }
 
     private func commit() {
@@ -112,7 +112,6 @@ struct HexField: View {
             return
         }
         onChange(parsed)
-        isEditing = false
     }
 }
 
@@ -129,7 +128,8 @@ struct ColorPickerPanel: View {
     @State private var brightness: Double
     @State private var hexText: String
     @State private var rgbText: String
-    @State private var isEditingText = false
+    @FocusState private var isHexFocused: Bool
+    @FocusState private var isRgbFocused: Bool
 
     init(chrome: Theme, label: String, color: Color, onChange: @escaping (Color) -> Void) {
         self.chrome = chrome
@@ -154,8 +154,14 @@ struct ColorPickerPanel: View {
                 HueBar(hue: $hue)
                     .onChange(of: hue) { _ in commitCurrentColor() }
                 HStack(spacing: 8) {
-                    valueField("HEX", text: $hexText) { Self.hex(from: $0) }
-                    valueField("RGB", text: $rgbText) { Self.rgb(from: $0) }
+                    valueField(
+                        "HEX", text: $hexText, isEditing: $isHexFocused,
+                        convert: { Self.hex(from: $0) }, format: { $0.hexString }
+                    )
+                    valueField(
+                        "RGB", text: $rgbText, isEditing: $isRgbFocused,
+                        convert: { Self.rgb(from: $0) }, format: { Self.rgbString(from: $0) }
+                    )
                 }
             }
             .padding(12)
@@ -198,8 +204,14 @@ struct ColorPickerPanel: View {
         }
     }
 
+    private var isEditingText: Bool { isHexFocused || isRgbFocused }
+
     private func valueField(
-        _ title: String, text: Binding<String>, convert: @escaping (String) -> Color?
+        _ title: String,
+        text: Binding<String>,
+        isEditing: FocusState<Bool>.Binding,
+        convert: @escaping (String) -> Color?,
+        format: @escaping (Color) -> String
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -215,11 +227,11 @@ struct ColorPickerPanel: View {
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(chrome.palette.foreground)
                     .textFieldStyle(.plain)
+                    .focused(isEditing)
                     .onChange(of: text.wrappedValue) { newValue in
-                        guard isEditingText, let parsed = convert(newValue) else { return }
+                        guard isEditing.wrappedValue, let parsed = convert(newValue) else { return }
                         apply(parsed)
                     }
-                    .onTapGesture { isEditingText = true }
             }
             .padding(.horizontal, 8)
             .frame(height: 32)
@@ -231,6 +243,9 @@ struct ColorPickerPanel: View {
             )
         }
         .frame(maxWidth: .infinity)
+        .onChange(of: isEditing.wrappedValue) { focused in
+            if !focused { text.wrappedValue = format(currentColor) }
+        }
     }
 
     private var currentColor: Color {
@@ -373,6 +388,7 @@ struct NumberField: View {
     let onChange: (CGFloat) -> Void
 
     @State private var text: String
+    @FocusState private var isFocused: Bool
 
     init(chrome: Theme, label: String, value: CGFloat, onChange: @escaping (CGFloat) -> Void) {
         self.chrome = chrome
@@ -398,10 +414,14 @@ struct NumberField: View {
                 .frame(width: 64, height: 32)
                 .background(chrome.palette.secondary.opacity(0.6))
                 .clipShape(RoundedRectangle(cornerRadius: chrome.radius.md))
+                .focused($isFocused)
                 .onSubmit(commit)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        .onChange(of: isFocused) { focused in
+            if !focused { commit() }
+        }
     }
 
     private func commit() {

@@ -11,6 +11,9 @@ struct ThemeEditorPanel: View {
     let chrome: Theme
     let session: ThemeEditorSession
     let initialAppearance: ThemeAppearance
+    @Binding var dragOffset: CGSize
+    let dragBounds: CGSize
+    let bodyMaxHeight: CGFloat
     let onSave: (Theme) throws -> Void
     let onClose: () -> Void
 
@@ -22,12 +25,18 @@ struct ThemeEditorPanel: View {
     @State private var simpleDirty: Set<ThemeAppearance> = []
     @State private var errorMessage: String?
     @State private var isMinimized = false
+    @State private var dragStart: CGSize?
+    @State private var isCancelHovering = false
+    @State private var isInspectHovering = false
 
     init(
         draft: Binding<Theme>,
         chrome: Theme,
         session: ThemeEditorSession,
         initialAppearance: ThemeAppearance,
+        dragOffset: Binding<CGSize>,
+        dragBounds: CGSize,
+        bodyMaxHeight: CGFloat,
         onSave: @escaping (Theme) throws -> Void,
         onClose: @escaping () -> Void
     ) {
@@ -35,6 +44,9 @@ struct ThemeEditorPanel: View {
         self.chrome = chrome
         self.session = session
         self.initialAppearance = initialAppearance
+        self._dragOffset = dragOffset
+        self.dragBounds = dragBounds
+        self.bodyMaxHeight = bodyMaxHeight
         self.onSave = onSave
         self.onClose = onClose
         _name = State(initialValue: session.initialName)
@@ -46,7 +58,9 @@ struct ThemeEditorPanel: View {
             header
             if !isMinimized {
                 bodyScroll
+                    .transition(.opacity)
                 footer
+                    .transition(.opacity)
             }
         }
         .frame(width: 416)
@@ -57,6 +71,7 @@ struct ThemeEditorPanel: View {
                 .stroke(chrome.palette.border.opacity(0.7), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
+        .onExitCommand(perform: onClose)
     }
 
     // MARK: - Header
@@ -83,12 +98,22 @@ struct ThemeEditorPanel: View {
                 .foregroundColor(chrome.palette.foreground)
                 .padding(.horizontal, 8)
                 .frame(height: 26)
-                .background(RoundedRectangle(cornerRadius: 6).fill(chrome.palette.accent.opacity(0.6)))
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            isInspectHovering
+                                ? chrome.palette.accent.opacity(0.9)
+                                : chrome.palette.accent.opacity(0.6)
+                        )
+                )
             }
             .buttonStyle(.plain)
+            .onHover { isInspectHovering = $0 }
             .help("Pick a color from the screen")
             Button {
-                isMinimized.toggle()
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    isMinimized.toggle()
+                }
             } label: {
                 Image(systemName: isMinimized ? "chevron.up" : "chevron.down")
                     .font(.system(size: 11, weight: .medium))
@@ -112,6 +137,20 @@ struct ThemeEditorPanel: View {
             Rectangle().fill(chrome.palette.border.opacity(0.7)).frame(height: 1)
         }
         .contentShape(Rectangle())
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    let base = dragStart ?? dragOffset
+                    dragStart = base
+                    dragOffset = clamped(
+                        CGSize(
+                            width: base.width + value.translation.width,
+                            height: base.height + value.translation.height
+                        )
+                    )
+                }
+                .onEnded { _ in dragStart = nil }
+        )
     }
 
     private var subtitle: String {
@@ -137,7 +176,7 @@ struct ThemeEditorPanel: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
         }
-        .frame(maxHeight: 640)
+        .frame(maxHeight: bodyMaxHeight)
     }
 
     private var nameField: some View {
@@ -198,6 +237,7 @@ struct ThemeEditorPanel: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            .animation(.easeOut(duration: 0.12), value: activeAppearance)
         }
     }
 
@@ -235,18 +275,22 @@ struct ThemeEditorPanel: View {
                     .tint(chrome.palette.primary)
                     .labelsHidden()
                     .onChange(of: isAdvanced) { advanced in
-                        if !advanced { enterGuidedMode() }
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            if !advanced { enterGuidedMode() }
+                        }
                     }
             }
         }
     }
 
     private var colorFields: some View {
-        VStack(spacing: 0) {
+        Group {
             if isAdvanced {
                 advancedGroups
+                    .transition(.opacity)
             } else {
                 guidedFields
+                    .transition(.opacity)
             }
         }
     }
@@ -395,7 +439,12 @@ struct ThemeEditorPanel: View {
                 .foregroundColor(chrome.palette.foreground)
                 .padding(.horizontal, 12)
                 .frame(height: 30)
-                .background(RoundedRectangle(cornerRadius: 6).fill(.clear))
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isCancelHovering ? chrome.palette.accent.opacity(0.1) : .clear)
+                )
+                .contentShape(Rectangle())
+                .onHover { isCancelHovering = $0 }
             Button(action: save) {
                 HStack(spacing: 4) {
                     if !session.isEditing {
@@ -411,6 +460,7 @@ struct ThemeEditorPanel: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(chrome.palette.primary))
             }
             .buttonStyle(.plain)
+            .keyboardShortcut("s", modifiers: [.command])
             .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             .opacity(name.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
         }
@@ -425,6 +475,17 @@ struct ThemeEditorPanel: View {
 
     private var currentPalette: Palette {
         draft.palette(for: activeAppearance)
+    }
+
+    /// Keeps the panel's edges inside the window; the resting spot is the
+    /// bottom-right, so offsets are never positive.
+    private func clamped(_ offset: CGSize) -> CGSize {
+        let horizontal = max(0, dragBounds.width - 448)
+        let vertical = max(0, dragBounds.height - 140)
+        return CGSize(
+            width: min(0, max(offset.width, -horizontal)),
+            height: min(0, max(offset.height, -vertical))
+        )
     }
 
     private func setPalette(_ palette: Palette, for appearance: ThemeAppearance) {
