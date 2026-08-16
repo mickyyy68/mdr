@@ -6,6 +6,9 @@ let package = Package(
     platforms: [
         .macOS(.v13)
     ],
+    products: [
+        .library(name: "MDReaderCore", targets: ["MDReaderCore"])
+    ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.8.0")
     ],
