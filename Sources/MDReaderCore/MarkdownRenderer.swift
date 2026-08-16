@@ -276,7 +276,10 @@ public struct MarkdownViewBuilder {
             }
             return label
 
-        case _ as SoftBreak, _ as LineBreak:
+        case _ as SoftBreak:
+            return AttributedString(" ", attributes: attrs)
+
+        case _ as LineBreak:
             return AttributedString("\n", attributes: attrs)
 
         default:
@@ -311,7 +314,7 @@ public struct MarkdownReaderView: View {
                 }
             }
             .padding(builder.theme.spacing.xxl)
-            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: 900, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .top)
         }
         .background(builder.theme.palette.background)
