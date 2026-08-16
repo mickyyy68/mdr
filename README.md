@@ -2,38 +2,51 @@
 
 A simple CLI tool that opens a native SwiftUI window rendering one or more
 markdown files, with a dark, Linear-inspired design system and configurable
-themes. See `AGENTS.md` for architecture and commands.
+themes.
 
-## Bundle
+![mdr demo](demo.png)
 
-`mdr` is a bare executable, not an `.app` bundle: it ships no resources
-(no images, fonts, or assets — SF Symbols and system fonts only), so the
-single binary is the entire distribution.
+The theme editor UI is taken entirely from [t3code](https://github.com/t3dotgg/t3code).
 
-| Artifact | Size |
-|---|---|
-| Release binary (`swift build -c release`) | 4.1 MB (arm64 Mach-O) |
-| Debug binary | 6.2 MB |
-| After `strip -x` | 1.9 MB — invalidates the code signature; re-sign with `codesign` before distributing |
-| Universal (arm64 + x86_64) | roughly double; release builds are arm64-only |
+![mdr theme editor](theme.png)
 
-Linkage: system frameworks only (AppKit, SwiftUI, Foundation, Combine,
-CoreFoundation) plus the `/usr/lib/swift` runtime. `swift-markdown` is
-statically linked; no third-party runtime dependencies.
+## Features
 
-## Performance
+- Renders one or more markdown files in a native macOS window
+- Dark-first design system inspired by Linear's design tokens
+- Custom themes via JSON config (`--theme` or `~/.config/mdr/theme.json`)
+- Syntax highlighting for code blocks
+- Appearance mode switching (System / Light / Dark)
 
-Measured on arm64 macOS with a release build (`/usr/bin/time -l`, `ps`).
+## Requirements
 
-| Scenario | RSS |
-|---|---|
-| 1 window, peak | 94.2 MB |
-| 1 window, 3s → 6s | 96.2 → 96.1 MB (stable) |
-| 3 windows | ~157 MB (~31 MB per extra window) |
+- macOS 13 or later
+- Swift 6 toolchain (to build)
 
-The baseline is the cost of a bare AppKit/SwiftUI window; the per-window
-cost dominates. Parsing and rendering run synchronously on the main thread
-(a known limitation — fine for typical files, very large files will lag),
-so RSS can spike transiently for very large documents. Settings/theme-editor
-delta was not measured (UI automation blocked); it is a lightweight overlay
-on the existing window and should be small.
+## Install
+
+Build a release binary and place it on your `PATH`:
+
+```bash
+swift build -c release
+cp .build/release/mdr /usr/local/bin/mdr
+```
+
+The release binary is a single, self-contained Mach-O with no third-party
+runtime dependencies.
+
+## Usage
+
+```bash
+mdr file.md                 # open one or more files
+mdr --theme theme.json file.md   # load design tokens from a JSON config
+mdr --help                  # usage
+mdr --version               # version
+```
+
+Themes default to `~/.config/mdr/theme.json` when no `--theme` is given.
+
+## Architecture
+
+`mdr` (thin app shell) → `MDReaderCore` (pure rendering logic) →
+`swift-markdown`. See `AGENTS.md` for details.
