@@ -82,6 +82,11 @@ core; everything else stays `internal`.
 - `swift-markdown` is pinned to `exact: 0.8.0`. Upgrading it is a deliberate act
   and should land as its own change with a full `swift test` run.
 - `Package.resolved` is committed and is the build source of truth.
+- Releasing: push a `vX.Y.Z` tag; `.github/workflows/release.yml` builds a
+  universal (arm64 + x86_64) binary, creates a GitHub Release with the
+  tarball, and publishes `Formula/mdr.rb` to the `mickyyy68/homebrew-tap`
+  repo (rendered from `formula/mdr.rb.erb`). Requires the `TAP_REPO_TOKEN`
+  secret (a PAT with repo scope on `mickyyy68/homebrew-tap`) for the tap push.
 - Bug notes and known issues live in `docs/bugs/` (dated files, same
   convention as `docs/specs/`).
 - Known limitations and non-goals:

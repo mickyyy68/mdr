@@ -1,0 +1,14 @@
+class Mdr < Formula
+  desc "Native SwiftUI markdown reader with a dark, Linear-inspired design system"
+  homepage "https://github.com/mickyyy68/mdr"
+  url "https://github.com/mickyyy68/mdr/releases/download/v<%= ENV["VERSION"] %>/mdr-<%= ENV["VERSION"] %>-macos-universal.tar.gz"
+  sha256 "<%= ENV["SHA"] %>"
+
+  def install
+    bin.install "mdr"
+  end
+
+  test do
+    system "#{bin}/mdr", "--version"
+  end
+end

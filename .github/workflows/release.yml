@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal binary
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Package and compute checksum
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          tar -C .build/apple/Products/Release \
+            -czf "dist/mdr-${VERSION}-macos-universal.tar.gz" mdr
+          shasum -a 256 "dist/mdr-${VERSION}-macos-universal.tar.gz" \
+            | awk '{ print $1 }' > dist/sha256.txt
+          echo "SHA256=$(cat dist/sha256.txt)"
+
+      - name: Render Homebrew formula
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA="$(cat dist/sha256.txt)"
+          VERSION="$VERSION" SHA="$SHA" erb formula/mdr.rb.erb > dist/mdr.rb
+          cat dist/mdr.rb
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/mdr.rb
+          generate_release_notes: true
+
+      - name: Publish formula to homebrew-tap
+        if: ${{ secrets.TAP_REPO_TOKEN != '' }}
+        env:
+          TAP_REPO_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
+          TAP_REPO: mickyyy68/homebrew-tap
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          git clone "https://x-access-token:${TAP_REPO_TOKEN}@github.com/${TAP_REPO}.git" tap
+          cd tap
+          cp ../dist/mdr.rb Formula/mdr.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/mdr.rb
+          git commit -m "mdr ${VERSION}"
+          git push
