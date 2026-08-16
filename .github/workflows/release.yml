@@ -1,6 +1,6 @@
 name: Release
 
-"on":
+on:
   push:
     tags:
       - "v*"
@@ -45,12 +45,15 @@ jobs:
           generate_release_notes: true
 
       - name: Publish formula to homebrew-tap
-        if: ${{ secrets.TAP_REPO_TOKEN != '' }}
         env:
           TAP_REPO_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
           TAP_REPO: mickyyy68/homebrew-tap
         run: |
           set -euo pipefail
+          if [ -z "${TAP_REPO_TOKEN:-}" ]; then
+            echo "TAP_REPO_TOKEN not set; skipping tap push"
+            exit 0
+          fi
           VERSION="${GITHUB_REF_NAME#v}"
           git clone "https://x-access-token:${TAP_REPO_TOKEN}@github.com/${TAP_REPO}.git" tap
           cd tap
